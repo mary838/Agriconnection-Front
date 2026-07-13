@@ -2,22 +2,61 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Heart, MapPin, Menu, Package, ShoppingBag } from "lucide-react";
 import {
-  Grid2X2,
-  Heart,
-  Settings,
-  ShoppingBag,
-  LogOut,
-  MapPin,
-  Package,
-} from "lucide-react";
-import { auth, profile as profileApi, customers as customersApi, getToken, clearToken, ApiError, type User, type Customer } from "@/lib/api";
+  profile as profileApi,
+  customers as customersApi,
+  orders as ordersApi,
+  wishlists as wishlistsApi,
+  carts as cartsApi,
+  getToken,
+  resolveImageUrl,
+  ApiError,
+  type User,
+  type Customer,
+  type Order,
+  type Wishlist,
+} from "@/lib/api";
+import CustomerSidebar from "@/components/CustomerSidebar";
+import { useCart } from "@/context/CartContext";
+import { useLanguage } from "@/context/LanguageContext";
+
+const STEPS = ["pending", "paid", "shipped", "delivered"];
+
+function orderTotal(order: Order): number | null {
+  const raw = order as Record<string, unknown>;
+  const total =
+    (raw.totalAmountUsd as number | string | undefined) ??
+    (raw.totalUsd as number | string | undefined) ??
+    (raw.amountUsd as number | string | undefined) ??
+    null;
+  return total === null ? null : Number(total);
+}
+
+function statusBadgeClass(status: string) {
+  const s = status.toLowerCase();
+  if (s === "delivered") return "bg-[#dff7ea] text-[#008454]";
+  if (s === "cancelled") return "bg-red-50 text-red-500";
+  return "bg-[#fff0cf] text-[#b17400]";
+}
 
 export default function CustomerDashboardPage() {
+  const { dict } = useLanguage();
+  const STEP_LABELS = [
+    dict.dashboard.customerHome.trackerPlaced,
+    dict.dashboard.customerHome.trackerPaid,
+    dict.dashboard.customerHome.trackerShipped,
+    dict.dashboard.customerHome.trackerDelivered,
+  ];
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [wishlist, setWishlist] = useState<Wishlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [movingToCart, setMovingToCart] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { refresh: refreshCart } = useCart();
 
   useEffect(() => {
     const fetchCustomerDashboard = async () => {
@@ -35,7 +74,6 @@ export default function CustomerDashboardPage() {
         localStorage.setItem("user", JSON.stringify(profileData));
 
         const customersData = await customersApi.list();
-
         const currentCustomer = customersData.find(
           (item) => item.userId === profileData.id
         );
@@ -44,6 +82,13 @@ export default function CustomerDashboardPage() {
           setCustomer(currentCustomer);
           localStorage.setItem("customer", JSON.stringify(currentCustomer));
         }
+
+        const [myOrders, myWishlist] = await Promise.all([
+          ordersApi.mine(),
+          wishlistsApi.mine(),
+        ]);
+        setOrders(myOrders);
+        setWishlist(myWishlist);
       } catch (err: unknown) {
         const message =
           err instanceof ApiError || err instanceof Error
@@ -58,71 +103,71 @@ export default function CustomerDashboardPage() {
     fetchCustomerDashboard();
   }, []);
 
+  const handleMoveAllToCart = async () => {
+    if (wishlist.length === 0) return;
+    try {
+      setMovingToCart(true);
+      for (const item of wishlist) {
+        await cartsApi.addItem({ productId: item.productId, quantity: 1 });
+        await wishlistsApi.remove(item.id);
+      }
+      setWishlist([]);
+      await refreshCart();
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Failed to move items to basket.";
+      setError(message);
+    } finally {
+      setMovingToCart(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4efe5] flex items-center justify-center text-[#102615]">
-        Loading customer dashboard...
+        {dict.dashboard.customerHome.loading}
       </main>
     );
   }
 
+  const sortedOrders = [...orders].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const activeOrder =
+    sortedOrders.find((o) => !["delivered", "cancelled"].includes(o.status.toLowerCase())) ||
+    sortedOrders[0];
+  const recentOrders = sortedOrders.slice(0, 4);
+  const wishlistPreview = wishlist.slice(0, 3);
+
+  const activeStepIndex = activeOrder
+    ? STEPS.indexOf(activeOrder.status.toLowerCase())
+    : -1;
+
   return (
     <main className="min-h-screen bg-[#f4efe5] flex text-[#102615]">
-      <aside className="w-[260px] bg-[#174832] min-h-screen p-7 flex flex-col justify-between">
-        <div>
-          <Link
-            href="/"
-            className="text-white text-2xl"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            AgriConnect
-          </Link>
+      <CustomerSidebar
+        active="Overview"
+        user={user}
+        customer={customer}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-          <p className="text-[#9db79d] text-[11px] tracking-[0.22em] uppercase mt-2 font-semibold">
-            Customer Portal
-          </p>
-
-          <nav className="mt-12 flex flex-col gap-2">
-            <SidebarLink active icon={<Grid2X2 size={16} />} label="Overview" href="/dashboard/customer" />
-            <SidebarLink icon={<ShoppingBag size={16} />} label="Orders" href="/dashboard/customer/orders" />
-            <SidebarLink icon={<Heart size={16} />} label="Wishlist" href="/dashboard/customer/wishlist" />
-            <SidebarLink icon={<Settings size={16} />} label="Profile" href="/profile" />
-          </nav>
-        </div>
-
-        <div className="rounded-2xl bg-white/10 p-4">
-          <Link href="/profile" className="flex items-center gap-3 hover:opacity-80">
-            <div className="w-11 h-11 rounded-full bg-[#dce8d4] flex items-center justify-center text-[#174832] font-bold">
-              {user?.name?.charAt(0).toUpperCase() || "U"}
-            </div>
-
-            <div>
-              <p className="text-white text-sm font-semibold">
-                {user?.name || "Customer"}
-              </p>
-              <p className="text-[#b8c9b3] text-xs">
-                {user?.email || "View profile"}
-              </p>
-            </div>
-          </Link>
-
+      <section className="flex-1 px-5 sm:px-8 md:px-12 py-6 sm:py-10">
+        <div className="md:hidden flex items-center gap-3 mb-6">
           <button
-            onClick={async () => {
-              await auth.logout().catch(() => {});
-              clearToken();
-              localStorage.removeItem("user");
-              localStorage.removeItem("customer");
-              window.location.href = "/login";
-            }}
-            className="mt-4 flex items-center gap-2 text-[#b8c9b3] text-sm hover:text-white"
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-[#102615] hover:text-[#1e6b42] transition-colors"
           >
-            <LogOut size={14} />
-            Sign out
+            <Menu size={22} />
           </button>
+          <p className="text-lg" style={{ fontFamily: "Georgia, serif" }}>
+            AgriConnect
+          </p>
         </div>
-      </aside>
 
-      <section className="flex-1 px-12 py-10">
         {error && (
           <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-red-600 text-sm">
             {error}
@@ -130,27 +175,27 @@ export default function CustomerDashboardPage() {
         )}
 
         <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
-          Welcome Back
+          {dict.dashboard.customerHome.welcomeBack}
         </p>
 
         <h1
-          className="text-[48px] leading-tight mb-10"
+          className="text-[32px] sm:text-[48px] leading-tight mb-10"
           style={{ fontFamily: "Georgia, serif" }}
         >
-          Hello, {user?.name || "Customer"}.{" "}
-          <em className="text-[#857d74] font-normal">Hungry?</em>
+          {dict.dashboard.customerHome.helloPrefix} {user?.name || dict.dashboard.customerHome.defaultCustomerName}.{" "}
+          <em className="text-[#857d74] font-normal">{dict.dashboard.customerHome.hungry}</em>
         </h1>
 
         {customer && (
-          <div className="grid md:grid-cols-4 gap-5 mb-8">
-            <InfoCard title="Customer Name" value={customer.name} />
-            <InfoCard title="Phone" value={customer.phone || "N/A"} />
-            <InfoCard title="District" value={customer.district || "N/A"} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+            <InfoCard title={dict.dashboard.customerHome.customerNameLabel} value={customer.name} />
+            <InfoCard title={dict.dashboard.customerHome.phoneLabel} value={customer.phone || dict.dashboard.shared.na} />
+            <InfoCard title={dict.dashboard.customerHome.districtLabel} value={customer.district || dict.dashboard.shared.na} />
             <InfoCard
-              title="Province"
+              title={dict.dashboard.customerHome.provinceLabel}
               value={
                 customer.province?.name ||
-                (customer.provinceId ? `Province ID ${customer.provinceId}` : "N/A")
+                (customer.provinceId ? `${dict.dashboard.customerHome.provinceIdPrefix} ${customer.provinceId}` : dict.dashboard.shared.na)
               }
             />
           </div>
@@ -159,59 +204,87 @@ export default function CustomerDashboardPage() {
         {!customer && !error && (
           <div className="mb-8 rounded-3xl border border-[#e0dbd0] bg-white p-6">
             <h2 className="text-xl font-semibold text-[#1c2b1a] mb-2">
-              Customer profile not found
+              {dict.dashboard.customerHome.profileNotFoundTitle}
             </h2>
             <p className="text-[#7a8a6a] text-sm">
-              Your account exists, but no customer profile is connected yet.
+              {dict.dashboard.customerHome.profileNotFoundBody}
             </p>
           </div>
         )}
 
-        <div className="bg-[#174832] rounded-[28px] p-8 text-white mb-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
-                <Package size={28} />
+        {activeOrder ? (
+          <div className="bg-[#174832] rounded-[28px] p-6 sm:p-8 text-white mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
+                  <Package size={28} />
+                </div>
+
+                <div>
+                  <p className="text-[#9db79d] text-xs tracking-[0.18em] uppercase font-bold">
+                    {dict.dashboard.customerHome.orderPrefix}{activeOrder.id.slice(0, 8)} — {activeOrder.status}
+                  </p>
+                  <h2
+                    className="text-2xl mt-1 capitalize"
+                    style={{ fontFamily: "Georgia, serif" }}
+                  >
+                    {activeOrder.status.toLowerCase() === "delivered"
+                      ? dict.dashboard.customerHome.delivered
+                      : activeOrder.status.toLowerCase() === "cancelled"
+                      ? dict.dashboard.customerHome.orderCancelled
+                      : dict.dashboard.customerHome.orderInProgress}
+                  </h2>
+
+                  <p className="flex items-center gap-1 text-[#b8c9b3] text-sm mt-2">
+                    <MapPin size={14} />
+                    {activeOrder.destinationAddress || customer?.address || dict.dashboard.customerHome.noAddressYet}
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <p className="text-[#9db79d] text-xs tracking-[0.18em] uppercase font-bold">
-                  Order #8812 — In Transit
-                </p>
-                <h2
-                  className="text-2xl mt-1"
-                  style={{ fontFamily: "Georgia, serif" }}
-                >
-                  Arriving tomorrow, 8–10am
-                </h2>
-
-                <p className="flex items-center gap-1 text-[#b8c9b3] text-sm mt-2">
-                  <MapPin size={14} />
-                  {customer?.address || "No address yet"}
-                </p>
-              </div>
+              <Link
+                href="/dashboard/customer/orders"
+                className="rounded-full border border-white/30 px-6 py-3 text-sm hover:bg-white/10 text-center"
+              >
+                {dict.dashboard.customerHome.trackOrder}
+              </Link>
             </div>
 
-            <button className="rounded-full border border-white/30 px-6 py-3 text-sm hover:bg-white/10">
-              Track order
-            </button>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 mt-9 text-xs text-[#b8c9b3]">
-            {["Placed", "Picked", "In transit", "Delivered"].map((step, i) => (
-              <div key={step}>
-                <div
-                  className={`h-1 rounded-full mb-3 ${
-                    i < 3 ? "bg-white" : "bg-white/20"
-                  }`}
-                />
-                <p className={i < 3 ? "text-white" : "text-white/40"}>
-                  {step}
-                </p>
+            {activeStepIndex >= 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 gap-y-5 mt-9 text-xs text-[#b8c9b3]">
+                {STEP_LABELS.map((step, i) => (
+                  <div key={step}>
+                    <div
+                      className={`h-1 rounded-full mb-3 ${
+                        i <= activeStepIndex ? "bg-white" : "bg-white/20"
+                      }`}
+                    />
+                    <p className={i <= activeStepIndex ? "text-white" : "text-white/40"}>
+                      {step}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-[28px] p-6 sm:p-8 border border-[#e6dfd2] mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "Georgia, serif" }}>
+                {dict.dashboard.customerHome.noOrdersTitle}
+              </h2>
+              <p className="text-[#8a8174] text-sm">
+                {dict.dashboard.customerHome.noOrdersBody}
+              </p>
+            </div>
+            <Link
+              href="/marketplace"
+              className="rounded-full bg-[#174832] text-white px-6 py-3 text-sm font-semibold hover:bg-[#123a27] text-center"
+            >
+              {dict.dashboard.customerHome.goToMarketplace}
+            </Link>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-[1.4fr_1fr] gap-10">
           <section className="bg-white rounded-[28px] p-8 border border-[#e6dfd2]">
@@ -220,47 +293,56 @@ export default function CustomerDashboardPage() {
                 className="text-2xl"
                 style={{ fontFamily: "Georgia, serif" }}
               >
-                Recent orders
+                {dict.dashboard.customerHome.recentOrdersTitle}
               </h2>
 
               <Link href="/dashboard/customer/orders" className="text-[#1e6b42] text-sm font-semibold">
-                View all
+                {dict.dashboard.shared.viewAll}
               </Link>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {orders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between rounded-2xl border border-[#eee7dc] p-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-[#f1eadf] flex items-center justify-center text-[#7c715f] text-sm">
-                      {order.num}
+            {recentOrders.length === 0 ? (
+              <p className="text-[#8a8174] text-sm">{dict.dashboard.customerHome.noOrdersInline}</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {recentOrders.map((order, i) => {
+                  const total = orderTotal(order);
+                  return (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between rounded-2xl border border-[#eee7dc] p-4"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#f1eadf] flex items-center justify-center text-[#7c715f] text-sm">
+                          #{i + 1}
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-[#102615]">
+                            {dict.dashboard.customerHome.orderPrefix}{order.id.slice(0, 8)}
+                          </p>
+                          <p className="text-[#8a8174] text-sm">
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {total !== null && (
+                        <p className="text-[#102615]">${total.toFixed(2)}</p>
+                      )}
+
+                      <span
+                        className={`text-[11px] font-bold rounded-full px-3 py-1 capitalize ${statusBadgeClass(
+                          order.status
+                        )}`}
+                      >
+                        {order.status}
+                      </span>
                     </div>
-
-                    <div>
-                      <p className="font-semibold text-[#102615]">{order.id}</p>
-                      <p className="text-[#8a8174] text-sm">
-                        {order.date} · {order.items}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-[#102615]">{order.price}</p>
-
-                  <span
-                    className={`text-[11px] font-bold rounded-full px-3 py-1 ${
-                      order.status === "IN TRANSIT"
-                        ? "bg-[#fff0cf] text-[#b17400]"
-                        : "bg-[#dff7ea] text-[#008454]"
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className="bg-white rounded-[28px] p-8 border border-[#e6dfd2]">
@@ -269,63 +351,66 @@ export default function CustomerDashboardPage() {
                 className="text-2xl"
                 style={{ fontFamily: "Georgia, serif" }}
               >
-                Wishlist
+                {dict.dashboard.customerHome.wishlistTitle}
               </h2>
 
               <Heart size={18} className="text-[#1e6b42]" />
             </div>
 
-            <div className="flex flex-col gap-5">
-              {wishlist.map((item) => (
-                <div key={item.name} className="flex items-center gap-4">
-                  <div
-                    className="w-14 h-14 rounded-full bg-cover bg-center"
-                    style={{ backgroundImage: `url(${item.image})` }}
-                  />
+            {wishlistPreview.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-8">
+                <ShoppingBag size={28} className="text-[#c9cdbf] mb-3" />
+                <p className="text-[#8a8174] text-sm">{dict.dashboard.customerHome.nothingSavedYet}</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {wishlistPreview.map((item) => {
+                  const product = item.product;
+                  const image =
+                    product?.images?.find((img) => img.isPrimary)?.imageUrl ||
+                    product?.imageUrl;
 
-                  <div className="flex-1">
-                    <p className="font-semibold text-[#102615]">{item.name}</p>
-                    <p className="text-[#8a8174] text-sm italic">{item.farm}</p>
-                  </div>
+                  return (
+                    <div key={item.id} className="flex items-center gap-4">
+                      <div
+                        className="w-14 h-14 rounded-full bg-cover bg-center bg-[#f1eadf]"
+                        style={
+                          image
+                            ? { backgroundImage: `url(${resolveImageUrl(image)})` }
+                            : undefined
+                        }
+                      />
 
-                  <p className="text-sm">{item.price}</p>
-                </div>
-              ))}
-            </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-[#102615]">
+                          {product?.name || dict.dashboard.customerHome.defaultProductName}
+                        </p>
+                        <p className="text-[#8a8174] text-sm italic">
+                          {product?.farmer?.user?.name || product?.farmer?.farmerCode || ""}
+                        </p>
+                      </div>
 
-            <button className="w-full mt-8 rounded-full border border-[#d8d0c3] py-3 text-sm font-semibold hover:border-[#1e6b42]">
-              Move all to basket
+                      {product && (
+                        <p className="text-sm">${Number(product.priceUsd).toFixed(2)}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleMoveAllToCart}
+              disabled={wishlist.length === 0 || movingToCart}
+              className="w-full mt-8 rounded-full border border-[#d8d0c3] py-3 text-sm font-semibold hover:border-[#1e6b42] disabled:opacity-50"
+            >
+              {movingToCart ? dict.dashboard.customerHome.moving : dict.dashboard.customerHome.moveAllToBasket}
             </button>
           </section>
         </div>
       </section>
     </main>
-  );
-}
-
-function SidebarLink({
-  icon,
-  label,
-  href,
-  active = false,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  href: string;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold ${
-        active
-          ? "bg-white/12 text-white"
-          : "text-[#b8c9b3] hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      {icon}
-      {label}
-    </Link>
   );
 }
 
@@ -339,33 +424,3 @@ function InfoCard({ title, value }: { title: string; value: string }) {
     </div>
   );
 }
-
-const orders = [
-  { num: "#12", id: "Order #8812", date: "Sep 12", items: "3 items", price: "$32.00", status: "IN TRANSIT" },
-  { num: "#80", id: "Order #8780", date: "Sep 4", items: "5 items", price: "$48.50", status: "DELIVERED" },
-  { num: "#41", id: "Order #8741", date: "Aug 28", items: "2 items", price: "$18.25", status: "DELIVERED" },
-  { num: "#02", id: "Order #8702", date: "Aug 19", items: "7 items", price: "$72.10", status: "DELIVERED" },
-];
-
-const wishlist = [
-  {
-    name: "Wildflower Honey",
-    farm: "Blackwood Apiary",
-    price: "$12.50",
-    image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=200&q=80",
-  },
-  {
-    name: "Strawberries",
-    farm: "Hilltop Berry",
-    price: "$5.75",
-    image: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=200&q=80",
-  },
-  {
-    name: "Heirloom Tomatoes",
-    farm: "Green Valley",
-    price: "$4.50",
-    image: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&q=80",
-  },
-];
-
-
