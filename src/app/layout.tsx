@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
 import SplashScreen from "@/components/SplashScreen";
 
 const geistSans = Geist({
@@ -24,8 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <AuthProvider>
-          <SplashScreen />
-          {children}
+          <CartProvider>
+            <SplashScreen />
+            {children}
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>

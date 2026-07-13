@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 const marketplace = [
   { label: "Fresh Harvest", href: "/marketplace" },
@@ -10,13 +11,18 @@ const marketplace = [
 ];
 
 const platform = [
-  { label: "Farmer Portal", href: "/dashboard/farmer" },
-  { label: "Admin Console", href: "/dashboard/admin" },
+  { label: "Farmer Portal", href: "/dashboard/farmer", role: "farmer" },
+  { label: "Admin Console", href: "/dashboard/admin", role: "admin" },
   { label: "API Docs", href: "/docs" },
   { label: "Support", href: "/support" },
 ];
 
 export default function Footer() {
+  const { user } = useAuth();
+  const visiblePlatformLinks = platform.filter(
+    (link) => !link.role || !user || user.role === link.role
+  );
+
   return (
     <footer className="bg-[#3b2d1f]">
       {/* Main footer content */}
@@ -63,7 +69,7 @@ export default function Footer() {
               Platform
             </p>
             <ul className="flex flex-col gap-3">
-              {platform.map((link) => (
+              {visiblePlatformLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}

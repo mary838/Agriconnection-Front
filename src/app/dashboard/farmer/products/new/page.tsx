@@ -3,17 +3,18 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { profile as profileApi, farmers as farmersApi, products as productsApi, inventory as inventoryApi, getToken, ApiError, type Farmer } from "@/lib/api";
+import { profile as profileApi, farmers as farmersApi, products as productsApi, inventory as inventoryApi, categories as categoriesApi, getToken, ApiError, type Farmer, type Category } from "@/lib/api";
 
 export default function NewProductPage() {
   const router = useRouter();
 
   const [farmer, setFarmer] = useState<Farmer | null>(null);
+  const [categoryList, setCategoryList] = useState<Category[]>([]);
 
   const [form, setForm] = useState({
     productCode: "",
     name: "",
-    category: "fruit",
+    categoryId: "",
     priceUsd: "",
     unit: "kg",
     stockQty: "",
@@ -38,7 +39,10 @@ export default function NewProductPage() {
         }
 
         const profileData = await profileApi.get();
-        const farmersData = await farmersApi.list();
+        const [farmersData, categoriesData] = await Promise.all([
+          farmersApi.list(),
+          categoriesApi.list(),
+        ]);
 
         const currentFarmer = farmersData.find(
           (item) => item.userId === profileData.id
@@ -49,6 +53,10 @@ export default function NewProductPage() {
         }
 
         setFarmer(currentFarmer);
+        setCategoryList(categoriesData);
+        if (categoriesData.length > 0) {
+          setForm((prev) => ({ ...prev, categoryId: String(categoriesData[0].id) }));
+        }
       } catch (err: unknown) {
         const message =
           err instanceof ApiError || err instanceof Error
@@ -63,26 +71,44 @@ export default function NewProductPage() {
     fetchFarmer();
   }, [router]);
 
+  const MAX_IMAGES = 6;
+
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
     const selectedFiles = Array.from(e.target.files);
+    e.target.value = "";
 
-    if (selectedFiles.length > 4) {
-      setError("You can upload maximum 4 images.");
-      return;
-    }
+    setImages((prev) => {
+      const combined = [...prev, ...selectedFiles];
 
+      if (combined.length > MAX_IMAGES) {
+        setError(`You can upload maximum ${MAX_IMAGES} images.`);
+        return combined.slice(0, MAX_IMAGES);
+      }
+
+      setError("");
+      return combined;
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
     setError("");
-    setImages(selectedFiles);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!farmer) return setError("Farmer profile not found.");
+    if (!farmer.provinceId) {
+      return setError(
+        "Your farmer profile has no province set. Please update your province in your profile before creating a product."
+      );
+    }
     if (!form.productCode.trim()) return setError("Product code is required.");
     if (!form.name.trim()) return setError("Product name is required.");
+    if (!form.categoryId) return setError("Category is required.");
     if (!form.priceUsd) return setError("Price is required.");
     if (!form.stockQty) return setError("Stock quantity is required.");
     if (images.length === 0) return setError("Please upload at least one image.");
@@ -99,7 +125,7 @@ export default function NewProductPage() {
       const productData = await productsApi.create({
         productCode: form.productCode.trim(),
         name: form.name.trim(),
-        category: form.category,
+        categoryId: Number(form.categoryId),
         farmerId: farmer.id,
         priceUsd: Number(form.priceUsd),
         unit: form.unit,
@@ -158,6 +184,17 @@ export default function NewProductPage() {
           Add new product
         </h1>
 
+        {farmer && !farmer.provinceId && (
+          <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-[14px] text-amber-800">
+            Your farmer profile has no province set, so inventory cannot be
+            created yet.{" "}
+            <Link href="/profile" className="font-semibold underline">
+              Update your province in your profile
+            </Link>{" "}
+            first.
+          </div>
+        )}
+
         <form
           onSubmit={handleSubmit}
           className="bg-white border border-[#e0dbd0] rounded-3xl p-8 flex flex-col gap-5"
@@ -179,14 +216,19 @@ export default function NewProductPage() {
           <div>
             <label className={labelClass}>Category</label>
             <select
-              value={form.category}
-              onChange={(e) => update("category", e.target.value)}
+              value={form.categoryId}
+              onChange={(e) => update("categoryId", e.target.value)}
               className={inputClass}
+              required
             >
-              <option value="fruit">Fruit</option>
-              <option value="spices">Spices</option>
-              <option value="leafy_greens">Leafy Greens</option>
-              <option value="grains">Grains</option>
+              {categoryList.length === 0 && (
+                <option value="">No categories available</option>
+              )}
+              {categoryList.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -197,12 +239,14 @@ export default function NewProductPage() {
               accept="image/*"
               multiple
               onChange={handleImagesChange}
-              required
-              className="w-full px-5 py-3.5 rounded-2xl bg-white border border-[#e0dbd0] text-[14px] text-[#1c2b1a] outline-none focus:border-[#2d5a1b] transition-colors"
+              required={images.length === 0}
+              disabled={images.length >= MAX_IMAGES}
+              className="w-full px-5 py-3.5 rounded-2xl bg-white border border-[#e0dbd0] text-[14px] text-[#1c2b1a] outline-none focus:border-[#2d5a1b] transition-colors disabled:opacity-60"
             />
             <p className="text-[12px] text-[#7a8a6a] mt-2">
-              Upload 1 to 4 images. The first image will be used as the main
-              product image.
+              Upload 1 to {MAX_IMAGES} images. You can select more than once
+              to add more. The first image will be used as the main product
+              image. ({images.length}/{MAX_IMAGES} selected)
             </p>
           </div>
 
@@ -210,7 +254,7 @@ export default function NewProductPage() {
             <div className="rounded-2xl border border-[#e0dbd0] bg-[#faf8f3] p-4">
               <p className={labelClass}>Image Preview</p>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                 {images.map((image, index) => (
                   <div
                     key={index}
@@ -227,6 +271,15 @@ export default function NewProductPage() {
                         Main
                       </span>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      aria-label={`Remove image ${index + 1}`}
+                      className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded-full bg-black/60 text-white text-[12px] leading-none hover:bg-black/80"
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>

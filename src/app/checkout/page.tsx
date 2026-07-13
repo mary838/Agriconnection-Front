@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
+import { orders as ordersApi, ApiError } from "@/lib/api";
 
-const orderItems = [
-  { name: "Heirloom Tomatoes (2 lb)", price: 9.0 },
-  { name: "Curly Kale (2 bunches)", price: 6.0 },
-  { name: "Wildflower Honey", price: 12.5 },
-];
 const DELIVERY_FEE = 4.5;
 
 const deliveryWindows = [
@@ -22,55 +22,71 @@ const inputClass =
   "w-full px-5 py-3 bg-[#f5f3ee] border border-[#e5e2d8] rounded-full text-[14px] text-[#333] outline-none focus:border-[#2d5a1b] transition-colors box-border";
 
 export default function CheckoutPage() {
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+  const { cart, loading: cartLoading, clearCart } = useCart();
+
   const [selectedWindow, setSelectedWindow] = useState(0);
   const [address, setAddress] = useState({
-    fullName: "Marcus Bell",
-    phone: "(555) 010-2233",
-    street: "48 Old Mill Rd",
-    city: "Sonoma",
-    zip: "95476",
+    fullName: "",
+    phone: "",
+    street: "",
+    city: "",
+    zip: "",
   });
   const [payment, setPayment] = useState({
-    cardNumber: "•••• •••• •••• 4242",
-    expiry: "08/29",
-    cvc: "123",
+    cardNumber: "",
+    expiry: "",
+    cvc: "",
   });
+  const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState("");
 
-  const subtotal = orderItems.reduce((sum, i) => sum + i.price, 0);
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      router.replace("/login?redirect=/checkout");
+    } else if (user.role !== "customer") {
+      router.replace("/");
+    }
+  }, [user, isLoading, router]);
+
+  const items = cart?.items || [];
+
+  useEffect(() => {
+    if (!isLoading && !cartLoading && user?.role === "customer" && items.length === 0) {
+      router.replace("/cart");
+    }
+  }, [isLoading, cartLoading, user, items.length, router]);
+
+  if (isLoading || !user || user.role !== "customer" || cartLoading || items.length === 0) return null;
+
+  const subtotal = items.reduce(
+    (sum, i) => sum + Number(i.product?.priceUsd || 0) * i.quantity,
+    0
+  );
   const total = subtotal + DELIVERY_FEE;
+
+  const handlePlaceOrder = async () => {
+    try {
+      setPlacing(true);
+      setError("");
+      const destinationAddress = `${address.street}, ${address.city} ${address.zip}`.trim();
+      await ordersApi.checkout({ destinationAddress });
+      await clearCart();
+      router.push("/dashboard/customer/orders");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error ? err.message : "Failed to place order.";
+      setError(message);
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f7f6f2]" style={{ fontFamily: "Georgia, serif" }}>
-
-      {/* Navbar */}
-      <nav className="bg-[#f7f6f2] border-b border-[#e5e2d8] sticky top-0 z-10">
-        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 h-[60px] flex items-center gap-4 sm:gap-8">
-          <Link href="/" className="italic text-[18px] sm:text-[20px] text-[#2d5a1b] font-semibold shrink-0">
-            AgriConnect
-          </Link>
-          <div className="hidden md:flex items-center gap-6">
-            {["Home", "Marketplace", "Farmer Portal", "Admin", "My Account"].map((link) => (
-              <Link key={link} href="#" className="text-[14px] text-[#555] hover:text-[#2d5a1b] transition-colors">
-                {link}
-              </Link>
-            ))}
-          </div>
-          <div className="ml-auto flex items-center gap-3 sm:gap-4">
-            <div className="relative">
-              <span className="text-[20px] cursor-pointer">🛒</span>
-              <span className="absolute -top-1.5 -right-2 bg-[#2d5a1b] text-white text-[10px] rounded-full w-[16px] h-[16px] flex items-center justify-center font-semibold">
-                3
-              </span>
-            </div>
-            <Link href="/login" className="hidden sm:block text-[14px] text-[#555] hover:text-[#2d5a1b] transition-colors">
-              Sign in
-            </Link>
-            <div className="w-[32px] h-[32px] rounded-full bg-[#8b6f47] flex items-center justify-center text-white text-[14px] font-semibold">
-              M
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Page content */}
       <div className="max-w-screen-lg mx-auto px-4 sm:px-6 py-8">
@@ -83,6 +99,12 @@ export default function CheckoutPage() {
         </Link>
 
         <h1 className="text-[32px] sm:text-[42px] font-normal text-[#1a1a1a] mb-8">Checkout</h1>
+
+        {error && (
+          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-600 text-sm">
+            {error}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
 
@@ -201,10 +223,14 @@ export default function CheckoutPage() {
           <div className="bg-white rounded-2xl p-6 border border-[#e8e4da] lg:sticky lg:top-20">
             <h3 className="text-[20px] font-normal text-[#1a1a1a] mb-5">Order</h3>
 
-            {orderItems.map((item, i) => (
-              <div key={i} className="flex justify-between text-[14px] text-[#444] mb-3">
-                <span>{item.name}</span>
-                <span className="shrink-0 ml-4">${item.price.toFixed(2)}</span>
+            {items.map((item) => (
+              <div key={item.id} className="flex justify-between text-[14px] text-[#444] mb-3">
+                <span>
+                  {item.product?.name || "Product"} ({item.quantity} {item.product?.unit})
+                </span>
+                <span className="shrink-0 ml-4">
+                  ${(Number(item.product?.priceUsd || 0) * item.quantity).toFixed(2)}
+                </span>
               </div>
             ))}
 
@@ -219,10 +245,11 @@ export default function CheckoutPage() {
             </div>
 
             <button
-              onClick={() => alert("Order placed successfully!")}
-              className="w-full py-4 bg-[#1e4d14] text-white rounded-full text-[15px] sm:text-[16px] font-semibold hover:bg-[#2d5a1b] transition-colors"
+              onClick={handlePlaceOrder}
+              disabled={placing}
+              className="w-full py-4 bg-[#1e4d14] text-white rounded-full text-[15px] sm:text-[16px] font-semibold hover:bg-[#2d5a1b] transition-colors disabled:opacity-50"
             >
-              Place order
+              {placing ? "Placing order..." : "Place order"}
             </button>
           </div>
         </div>

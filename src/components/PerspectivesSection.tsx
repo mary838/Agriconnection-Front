@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 const perspectives = [
   {
@@ -16,6 +17,7 @@ const perspectives = [
     ],
     cta: "Customer dashboard →",
     href: "/dashboard/customer",
+    role: "customer",
     featured: false,
   },
   {
@@ -31,6 +33,7 @@ const perspectives = [
     ],
     cta: "Farmer portal →",
     href: "/dashboard/farmer",
+    role: "farmer",
     featured: true,
   },
   {
@@ -46,11 +49,17 @@ const perspectives = [
     ],
     cta: "Admin console →",
     href: "/dashboard/admin",
+    role: "admin",
     featured: false,
   },
 ];
 
 export default function PerspectivesSection() {
+  const { user } = useAuth();
+  const visiblePerspectives = user
+    ? perspectives.filter((p) => p.role === user.role)
+    : perspectives;
+
   return (
     <section className="bg-[#f5f2eb] py-20">
       <div className="max-w-screen-xl mx-auto px-6 lg:px-12">
@@ -70,7 +79,7 @@ export default function PerspectivesSection() {
 
         {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
-          {perspectives.map((p) => (
+          {visiblePerspectives.map((p) => (
             <div
               key={p.number}
               className={`rounded-2xl flex flex-col p-8 ${

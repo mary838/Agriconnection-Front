@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { ShoppingCart, Menu, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ShoppingCart, Menu, X, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
+import { notifications as notificationsApi, type Notification } from "@/lib/api";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -14,23 +16,74 @@ const navLinks = [
   { label: "My Account", href: "/dashboard/customer", role: "customer" },
 ];
 
-interface NavbarProps {
-  cartCount?: number;
-}
-
-export default function Navbar({ cartCount = 3 }: NavbarProps) {
+export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { count: cartCount } = useCart();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifItems, setNotifItems] = useState<Notification[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifItems([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    notificationsApi
+      .mine()
+      .then((data) => {
+        if (!cancelled) setNotifItems(data);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const unreadCount = notifItems.filter((n) => !n.isRead).length;
+
+  const handleNotifClick = async (notif: Notification) => {
+    if (!notif.isRead) {
+      setNotifItems((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+      );
+      try {
+        await notificationsApi.markRead(notif.id);
+      } catch {}
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    setNotifItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    try {
+      await notificationsApi.markAllRead();
+    } catch {}
+  };
 
   const handleCartClick = (e: React.MouseEvent) => {
     if (!user) {
@@ -87,19 +140,79 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
           <div className="flex-1 hidden md:block" />
 
           <div className="flex items-center gap-3 shrink-0">
-            <Link
-              href="/cart"
-              onClick={handleCartClick}
-              className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
-              aria-label={`Cart, ${cartCount} items`}
-            >
-              <ShoppingCart size={22} strokeWidth={1.8} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
+            {(!user || user.role === "customer") && (
+              <Link
+                href="/cart"
+                onClick={handleCartClick}
+                className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                aria-label={`Cart, ${cartCount} items`}
+              >
+                <ShoppingCart size={22} strokeWidth={1.8} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
+            {user && (
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setNotifOpen((v) => !v)}
+                  className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                  aria-label={`Notifications, ${unreadCount} unread`}
+                >
+                  <Bell size={22} strokeWidth={1.8} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white/95 backdrop-blur-md border border-[#dce4d3] shadow-sm rounded-lg z-50">
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e8eed8]">
+                      <span className="text-[13.5px] font-medium text-[#2d5a1b]">
+                        Notifications
+                      </span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[12px] text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+
+                    {notifItems.length === 0 ? (
+                      <p className="px-4 py-6 text-[13px] text-[#4a5568] text-center">
+                        No notifications yet.
+                      </p>
+                    ) : (
+                      notifItems.map((notif) => (
+                        <button
+                          key={notif.id}
+                          onClick={() => handleNotifClick(notif)}
+                          className={`w-full text-left px-4 py-2.5 border-b border-[#e8eed8] last:border-0 transition-colors hover:bg-[#e8eed8] ${
+                            notif.isRead ? "bg-white" : "bg-[#f4faee]"
+                          }`}
+                        >
+                          <p className="text-[13px] font-medium text-[#2d5a1b]">
+                            {notif.title}
+                          </p>
+                          <p className="text-[12.5px] text-[#4a5568] mt-0.5">
+                            {notif.message}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {user ? (
               <>
