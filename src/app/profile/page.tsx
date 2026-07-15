@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Mail, Phone, Send, Check, X, MapPin } from "lucide-react";
+import { Pencil, Mail, Phone, Send, Check, X, MapPin, Camera } from "lucide-react";
 import {
   profile as profileApi,
   farmers as farmersApi,
@@ -40,6 +40,9 @@ export default function ProfilePage() {
   const [draftName, setDraftName] = useState("");
   const [draftPhone, setDraftPhone] = useState("");
   const [draftTelegramPhone, setDraftTelegramPhone] = useState("");
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -175,6 +178,41 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be smaller than 5MB.");
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+      setError("");
+      setSuccess("");
+
+      const data = await profileApi.uploadAvatar(file);
+
+      setProfile(data);
+      localStorage.setItem("user", JSON.stringify(data));
+      setSuccess("Profile photo updated.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Something went wrong.";
+      setError(message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     router.push("/login");
@@ -223,17 +261,43 @@ export default function ProfilePage() {
         <div className="bg-white px-6 pb-8">
           {/* Avatar — overlapping the header */}
           <div className="flex flex-col items-center -mt-10 mb-4">
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt={profile.name}
-                className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-white"
+            <div className="relative w-20 h-20">
+              {profile?.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt={profile.name}
+                  className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-white"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-[#1a3d1a] flex items-center justify-center text-white text-[32px] font-bold shadow-lg ring-4 ring-white">
+                  {avatarLetter}
+                </div>
+              )}
+
+              {uploadingAvatar && (
+                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+
+              <button
+                type="button"
+                aria-label="Change profile photo"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#1a3d1a] ring-2 ring-white flex items-center justify-center text-white hover:bg-[#153215] transition-colors disabled:opacity-50"
+              >
+                <Camera size={13} />
+              </button>
+
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={handleAvatarChange}
               />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-[#1a3d1a] flex items-center justify-center text-white text-[32px] font-bold shadow-lg ring-4 ring-white">
-                {avatarLetter}
-              </div>
-            )}
+            </div>
             <h2 className="mt-3 text-[#1a3d1a] text-[20px] font-bold">
               {profile?.name}
             </h2>

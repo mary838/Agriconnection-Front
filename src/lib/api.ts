@@ -374,6 +374,15 @@ export const profile = {
   get: () => request<User>("/profile"),
   update: (body: Partial<Pick<User, "name" | "phone" | "telegramPhone">>) =>
     request<User>("/profile", { method: "PUT", body }),
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return request<User>("/profile/avatar", {
+      method: "POST",
+      body: formData,
+      isFormData: true,
+    });
+  },
 };
 
 // ---------- Farmers ----------
