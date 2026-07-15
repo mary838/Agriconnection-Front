@@ -2,35 +2,50 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { ShoppingCart, Menu, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ShoppingCart, Menu, X, Bell, Globe } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { useNotifications } from "@/context/NotificationContext";
+import { LANGUAGES } from "@/lib/i18n";
 
-const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "Marketplace", href: "/marketplace" },
-  { label: "Farmer Portal", href: "/dashboard/farmer" },
-  { label: "Admin", href: "/dashboard/admin" },
-  { label: "My Account", href: "/dashboard/customer" },
-  { label: "Profile", href: "/profile" },
-];
-
-interface NavbarProps {
-  cartCount?: number;
-}
-
-export default function Navbar({ cartCount = 3 }: NavbarProps) {
+export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { count: cartCount } = useCart();
+  const { language, setLanguage, dict } = useLanguage();
+  const { unreadCount } = useNotifications();
+
+  const navLinks = [
+    { label: dict.nav.home, href: "/" },
+    { label: dict.nav.marketplace, href: "/marketplace" },
+    { label: dict.nav.farmerPortal, href: "/dashboard/farmer", role: "farmer" },
+    { label: dict.nav.admin, href: "/dashboard/admin", role: "admin" },
+    { label: dict.nav.myAccount, href: "/dashboard/customer", role: "customer" },
+  ];
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   const handleCartClick = (e: React.MouseEvent) => {
@@ -42,11 +57,6 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
 
   const handleLogout = async () => {
     await logout();
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("customer");
-    localStorage.removeItem("farmer");
-    sessionStorage.removeItem("access_token");
     router.push("/");
   };
 
@@ -72,7 +82,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
 
           <div className="hidden md:flex items-center gap-0 flex-1">
             {navLinks.map((link) => {
-              if (!user && link.href === "/profile") return null;
+              if (link.role && user?.role !== link.role) return null;
 
               return (
                 <Link
@@ -90,29 +100,81 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
             })}
           </div>
 
-          <div className="flex-1 hidden md:block" />
+          <div className="flex-1" />
 
           <div className="flex items-center gap-3 shrink-0">
-            <Link
-              href="/cart"
-              onClick={handleCartClick}
-              className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
-              aria-label={`Cart, ${cartCount} items`}
-            >
-              <ShoppingCart size={22} strokeWidth={1.8} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
-                  {cartCount}
+            {(!user || user.role === "customer") && (
+              <Link
+                href="/cart"
+                onClick={handleCartClick}
+                className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                aria-label={`Cart, ${cartCount} items`}
+              >
+                <ShoppingCart size={22} strokeWidth={1.8} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangOpen((v) => !v)}
+                className="flex items-center gap-1 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                aria-label={dict.nav.language}
+                title={dict.nav.language}
+              >
+                <Globe size={20} strokeWidth={1.8} />
+                <span className="hidden sm:inline text-[12.5px] font-medium uppercase">
+                  {language}
                 </span>
+              </button>
+
+              {langOpen && (
+                <div className="absolute right-0 top-full mt-2 w-40 bg-white/95 backdrop-blur-md border border-[#dce4d3] shadow-sm rounded-lg z-50 overflow-hidden">
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => {
+                        setLanguage(l.code);
+                        setLangOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-[13px] transition-colors hover:bg-[#e8eed8] ${
+                        language === l.code
+                          ? "text-[#2d5a1b] font-medium bg-[#f4faee]"
+                          : "text-[#4a5568]"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
               )}
-            </Link>
+            </div>
+
+            {user && (
+              <Link
+                href="/notifications"
+                className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                aria-label={`${dict.nav.notifications}, ${unreadCount} unread`}
+              >
+                <Bell size={22} strokeWidth={1.8} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {user ? (
               <>
                 <Link
                   href="/profile"
                   className="w-[34px] h-[34px] rounded-full bg-[#b8cfa8] ring-2 ring-[#c8d8b8] shrink-0 flex items-center justify-center text-[#2d5a1b] text-[13px] font-semibold"
-                  title="Profile"
+                  title={dict.nav.profile}
                 >
                   {initials}
                 </Link>
@@ -121,7 +183,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
                   onClick={handleLogout}
                   className="hidden sm:block text-[13.5px] text-[#4a5568] hover:text-[#2d5a1b] transition-colors px-1"
                 >
-                  Log out
+                  {dict.nav.logOut}
                 </button>
               </>
             ) : (
@@ -130,7 +192,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
                   href="/login"
                   className="hidden sm:block text-[13.5px] text-[#4a5568] hover:text-[#2d5a1b] transition-colors px-1"
                 >
-                  Sign in
+                  {dict.nav.signIn}
                 </Link>
 
                 <div className="w-[34px] h-[34px] rounded-full bg-[#e8eed8] ring-2 ring-[#c8d8b8] shrink-0" />
@@ -140,7 +202,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
             <button
               className="md:hidden p-1.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label="Toggle menu"
+              aria-label={dict.nav.toggleMenu}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -151,7 +213,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
       {mobileOpen && (
         <div className="md:hidden border-t border-[#dce4d3] bg-white/90 backdrop-blur-md px-6 py-3 flex flex-col">
           {navLinks.map((link) => {
-            if (!user && link.href === "/profile") return null;
+            if (link.role && user?.role !== link.role) return null;
 
             return (
               <Link
@@ -176,7 +238,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
                 onClick={() => setMobileOpen(false)}
                 className="text-sm py-2.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
               >
-                Profile ({user.email})
+                {dict.nav.profile} ({user.email})
               </Link>
 
               <button
@@ -186,7 +248,7 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
                 }}
                 className="text-sm py-2.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors text-left"
               >
-                Log out
+                {dict.nav.logOut}
               </button>
             </>
           ) : (
@@ -195,9 +257,30 @@ export default function Navbar({ cartCount = 3 }: NavbarProps) {
               onClick={() => setMobileOpen(false)}
               className="text-sm py-2.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
             >
-              Sign in
+              {dict.nav.signIn}
             </Link>
           )}
+
+          <div className="py-2.5 border-t border-[#e8eed8] mt-1">
+            <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#7a8a6a] mb-2">
+              {dict.nav.language}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => setLanguage(l.code)}
+                  className={`px-3 py-1.5 rounded-full text-[13px] transition-colors ${
+                    language === l.code
+                      ? "bg-[#1e3d18] text-white"
+                      : "bg-[#f0ece4] text-[#4a5568]"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </nav>

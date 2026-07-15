@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { auth as authApi, clearToken, setToken } from "@/lib/api";
 
 export type AuthUser = { email: string; role: string };
 
 type AuthCtx = {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (user: AuthUser, token: string) => void;
+  login: (user: AuthUser, token: string, remember?: boolean) => void;
   logout: () => Promise<void>;
 };
 
@@ -34,33 +35,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setUser(readStoredUser());
+    const stored = readStoredUser();
+    setUser((prev) => {
+      if (prev === stored) return prev;
+      if (prev && stored && prev.email === stored.email && prev.role === stored.role) {
+        return prev;
+      }
+      return stored;
+    });
     setIsLoading(false);
   }, [pathname]);
 
-  const login = (userData: AuthUser, token: string) => {
-    localStorage.setItem("access_token", token);
+  const login = (userData: AuthUser, token: string, remember = true) => {
+    setToken(token, remember);
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
   };
 
   const logout = async () => {
-    const token =
-      localStorage.getItem("access_token") ||
-      sessionStorage.getItem("access_token");
     try {
-      await fetch("http://localhost:3000/auth/logout", {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      await authApi.logout();
     } catch {}
-    localStorage.removeItem("access_token");
+    clearToken();
     localStorage.removeItem("user");
     localStorage.removeItem("customer");
     localStorage.removeItem("farmer");
-    sessionStorage.removeItem("access_token");
     setUser(null);
   };
 

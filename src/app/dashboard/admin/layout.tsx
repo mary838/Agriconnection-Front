@@ -1,3 +1,5 @@
+import RoleGuard from "@/components/RoleGuard";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <RoleGuard allowedRole="admin">{children}</RoleGuard>;
 }

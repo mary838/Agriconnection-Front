@@ -1,92 +1,150 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, SlidersHorizontal, ChevronDown, Heart } from "lucide-react";
 import Link from "next/link";
 import Pagination from "@/components/Pagination";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-type Product = {
-  id: string;
-  productCode: string;
-  name: string;
-  category: string;
-  farmerId: string;
-  imageUrl?: string;
-  priceUsd: number | string;
-  unit: string;
-  farmer?: {
-    id: string;
-    farmerCode?: string;
-    user?: {
-      name?: string;
-    };
-  };
-};
-
-const categories = [
-  "All produce",
-  "fruit",
-  "spices",
-  "leafy_greens",
-  "grains",
-];
+import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import {
+  products as productsApi,
+  categories as categoriesApi,
+  wishlists as wishlistsApi,
+  ApiError,
+  categoryName,
+  categoryId,
+  resolveImageUrl,
+  isOutOfStock,
+  type Product,
+  type Category,
+} from "@/lib/api";
 
 const ITEMS_PER_PAGE = 8;
 
+type SortOption = "recommended" | "price-asc" | "price-desc" | "newest";
+
 export default function MarketplacePage() {
+  const { user } = useAuth();
+  const { language, dict } = useLanguage();
+  const isCustomer = user?.role === "customer";
   const [products, setProducts] = useState<Product[]>([]);
-  const [activeCategory, setActiveCategory] = useState("All produce");
+  const [categoryList, setCategoryList] = useState<Category[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
+  const [sortOption, setSortOption] = useState<SortOption>("recommended");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [wishlistedIds, setWishlistedIds] = useState<Set<string>>(new Set());
+  const [wishlistBusyId, setWishlistBusyId] = useState<string | null>(null);
+
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const filtersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const token =
-          localStorage.getItem("access_token") ||
-          sessionStorage.getItem("access_token");
-
-        if (!token) {
-          window.location.href = "/login?redirect=/marketplace";
-          return;
-        }
-
-        const res = await fetch(`${API_URL}/products`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || "Failed to load products.");
-        }
-
-        setProducts(data);
-      } catch (err: any) {
-        setError(err.message || "Something went wrong.");
+        const [productsData, categoriesData] = await Promise.all([
+          productsApi.list(language),
+          categoriesApi.list(language),
+        ]);
+        setProducts(productsData);
+        setCategoryList(categoriesData);
+      } catch (err: unknown) {
+        const message =
+          err instanceof ApiError || err instanceof Error
+            ? err.message
+            : dict.marketplace.somethingWrong;
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
-  }, []);
+    fetchData();
+  }, [language]);
+
+  useEffect(() => {
+    if (!isCustomer) {
+      setWishlistedIds(new Set());
+      return;
+    }
+
+    wishlistsApi
+      .mine()
+      .then((items) => setWishlistedIds(new Set(items.map((item) => item.productId))))
+      .catch(() => {});
+  }, [isCustomer]);
+
+  const handleToggleWishlist = async (e: React.MouseEvent, productId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isCustomer) {
+      setError(dict.marketplace.wishlistOnlyCustomer);
+      return;
+    }
+
+    try {
+      setWishlistBusyId(productId);
+      if (wishlistedIds.has(productId)) {
+        await wishlistsApi.removeByProduct(productId);
+        setWishlistedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      } else {
+        await wishlistsApi.add({ productId });
+        setWishlistedIds((prev) => new Set(prev).add(productId));
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : dict.marketplace.wishlistUpdateFailed;
+      setError(message);
+    } finally {
+      setWishlistBusyId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [filtersOpen]);
+
+  const categoryOptions = useMemo(
+    () => [
+      { id: "all" as const, name: dict.marketplace.allProduce },
+      ...categoryList.map((c) => ({ id: c.id, name: c.name })),
+    ],
+    [categoryList, dict.marketplace.allProduce]
+  );
+
+  const activeFilterCount = (minPrice ? 1 : 0) + (maxPrice ? 1 : 0);
 
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    const min = minPrice ? Number(minPrice) : null;
+    const max = maxPrice ? Number(maxPrice) : null;
+
+    const result = products.filter((p) => {
+      if (isOutOfStock(p)) return false;
+
+      const category = categoryName(p.category);
       const matchCat =
-        activeCategory === "All produce" || p.category === activeCategory;
+        activeCategoryId === "all" || categoryId(p.category) === activeCategoryId;
 
       const farmName =
         p.farmer?.user?.name || p.farmer?.farmerCode || "Local Farmer";
@@ -94,11 +152,26 @@ export default function MarketplacePage() {
       const matchSearch =
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         farmName.toLowerCase().includes(search.toLowerCase()) ||
-        p.category.toLowerCase().includes(search.toLowerCase());
+        category.toLowerCase().includes(search.toLowerCase());
 
-      return matchCat && matchSearch;
+      const price = Number(p.priceUsd);
+      const matchPrice = (min === null || price >= min) && (max === null || price <= max);
+
+      return matchCat && matchSearch && matchPrice;
     });
-  }, [activeCategory, search, products]);
+
+    switch (sortOption) {
+      case "price-asc":
+        return [...result].sort((a, b) => Number(a.priceUsd) - Number(b.priceUsd));
+      case "price-desc":
+        return [...result].sort((a, b) => Number(b.priceUsd) - Number(a.priceUsd));
+      case "newest":
+        // Product has no createdAt field yet; the API returns oldest-first, so reverse as a proxy.
+        return [...result].reverse();
+      default:
+        return result;
+    }
+  }, [activeCategoryId, search, products, sortOption, minPrice, maxPrice]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
 
@@ -107,8 +180,8 @@ export default function MarketplacePage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleCategoryChange = (cat: string) => {
-    setActiveCategory(cat);
+  const handleCategoryChange = (id: number | "all") => {
+    setActiveCategoryId(id);
     setCurrentPage(1);
   };
 
@@ -120,7 +193,7 @@ export default function MarketplacePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center text-[#1c2b1a]">
-        Loading products...
+        {dict.marketplace.loading}
       </div>
     );
   }
@@ -130,18 +203,18 @@ export default function MarketplacePage() {
       <div className="max-w-screen-xl mx-auto px-6 lg:px-12 py-12">
         <div className="mb-8">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#2d5a1b] mb-2">
-            The Marketplace
+            {dict.marketplace.eyebrow}
           </p>
 
           <h1
             className="text-[32px] sm:text-[44px] font-semibold text-[#1c2b1a] leading-tight mb-2"
             style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
           >
-            Today's fresh harvest
+            {dict.marketplace.title}
           </h1>
 
           <p className="text-[15px] text-[#7a8a6a]">
-            Browse fresh products from verified local farmers.
+            {dict.marketplace.subtitle}
           </p>
         </div>
 
@@ -160,24 +233,95 @@ export default function MarketplacePage() {
 
             <input
               type="text"
-              placeholder="Search produce, farms, categories..."
+              placeholder={dict.marketplace.searchPlaceholder}
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-[#e0dbd0] rounded-xl text-[#1c2b1a] placeholder-[#b0b8a0] focus:outline-none focus:border-[#2d5a1b] transition-colors"
             />
           </div>
 
-          <button className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e0dbd0] rounded-xl text-[14px] text-[#4a5568] hover:border-[#2d5a1b] transition-colors whitespace-nowrap">
-            <SlidersHorizontal size={15} />
-            Filters
-          </button>
+          <div className="relative" ref={filtersRef}>
+            <button
+              onClick={() => setFiltersOpen((open) => !open)}
+              className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e0dbd0] rounded-xl text-[14px] text-[#4a5568] hover:border-[#2d5a1b] transition-colors whitespace-nowrap"
+            >
+              <SlidersHorizontal size={15} />
+              {dict.marketplace.filters}
+              {activeFilterCount > 0 && (
+                <span className="flex items-center justify-center w-5 h-5 text-[11px] font-semibold rounded-full bg-[#2d5a1b] text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {filtersOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-20 w-64 bg-white border border-[#e0dbd0] rounded-xl shadow-lg p-4">
+                <p className="text-[13px] font-semibold text-[#1c2b1a] mb-3">
+                  {dict.marketplace.priceRange}
+                </p>
+
+                <div className="flex items-center gap-2 mb-4">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder={dict.marketplace.min}
+                    value={minPrice}
+                    onChange={(e) => {
+                      setMinPrice(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-3 py-2 text-[13px] bg-[#faf9f6] border border-[#e0dbd0] rounded-lg text-[#1c2b1a] focus:outline-none focus:border-[#2d5a1b]"
+                  />
+                  <span className="text-[#9aaa8a] text-[13px]">{dict.marketplace.to}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder={dict.marketplace.max}
+                    value={maxPrice}
+                    onChange={(e) => {
+                      setMaxPrice(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-3 py-2 text-[13px] bg-[#faf9f6] border border-[#e0dbd0] rounded-lg text-[#1c2b1a] focus:outline-none focus:border-[#2d5a1b]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setMinPrice("");
+                      setMaxPrice("");
+                      setCurrentPage(1);
+                    }}
+                    className="text-[13px] text-[#7a8a6a] hover:text-[#2d5a1b] transition-colors"
+                  >
+                    {dict.marketplace.clear}
+                  </button>
+
+                  <button
+                    onClick={() => setFiltersOpen(false)}
+                    className="px-4 py-2 text-[13px] font-medium rounded-lg bg-[#1e3d18] text-white hover:bg-[#2d5a1b] transition-colors"
+                  >
+                    {dict.marketplace.apply}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="relative">
-            <select className="appearance-none pl-4 pr-9 py-3 bg-white border border-[#e0dbd0] rounded-xl text-[14px] text-[#4a5568] hover:border-[#2d5a1b] transition-colors focus:outline-none cursor-pointer">
-              <option>Sort: Recommended</option>
-              <option>Sort: Price low-high</option>
-              <option>Sort: Price high-low</option>
-              <option>Sort: Newest</option>
+            <select
+              value={sortOption}
+              onChange={(e) => {
+                setSortOption(e.target.value as SortOption);
+                setCurrentPage(1);
+              }}
+              className="appearance-none pl-4 pr-9 py-3 bg-white border border-[#e0dbd0] rounded-xl text-[14px] text-[#4a5568] hover:border-[#2d5a1b] transition-colors focus:outline-none cursor-pointer"
+            >
+              <option value="recommended">{dict.marketplace.sortRecommended}</option>
+              <option value="price-asc">{dict.marketplace.sortPriceAsc}</option>
+              <option value="price-desc">{dict.marketplace.sortPriceDesc}</option>
+              <option value="newest">{dict.marketplace.sortNewest}</option>
             </select>
 
             <ChevronDown
@@ -188,17 +332,17 @@ export default function MarketplacePage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap mb-8">
-          {categories.map((cat) => (
+          {categoryOptions.map((cat) => (
             <button
-              key={cat}
-              onClick={() => handleCategoryChange(cat)}
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id)}
               className={`px-4 py-2 rounded-full text-[13.5px] font-medium transition-colors ${
-                activeCategory === cat
+                activeCategoryId === cat.id
                   ? "bg-[#1e3d18] text-white"
                   : "bg-white border border-[#e0dbd0] text-[#4a5568] hover:border-[#2d5a1b] hover:text-[#2d5a1b]"
               }`}
             >
-              {cat === "All produce" ? "All produce" : cat.replace("_", " ")}
+              {cat.name.replace("_", " ")}
             </button>
           ))}
         </div>
@@ -209,7 +353,7 @@ export default function MarketplacePage() {
               const farmName =
                 product.farmer?.user?.name ||
                 product.farmer?.farmerCode ||
-                "Local Farmer";
+                dict.marketplace.localFarmer;
 
               return (
                 <Link
@@ -219,17 +363,38 @@ export default function MarketplacePage() {
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-[#e8e0d0]">
                     <img
-                      src={
-                        product.imageUrl ||
-                        "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=600&q=80"
-                      }
+                      src={resolveImageUrl(
+                        product.images?.find((img) => img.isPrimary)?.imageUrl ||
+                          product.images?.[0]?.imageUrl ||
+                          product.imageUrl
+                      ) || "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=600&q=80"}
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
 
                     <span className="absolute top-3 left-3 text-[10px] font-semibold tracking-[0.1em] px-3 py-1 rounded-full bg-[#1e3d18] text-white uppercase">
-                      {product.category.replace("_", " ")}
+                      {categoryName(product.category).replace("_", " ")}
                     </span>
+
+                    <button
+                      onClick={(e) => handleToggleWishlist(e, product.id)}
+                      disabled={wishlistBusyId === product.id}
+                      aria-label={
+                        wishlistedIds.has(product.id)
+                          ? dict.marketplace.removeFromWishlist
+                          : dict.marketplace.addToWishlist
+                      }
+                      className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 ${
+                        wishlistedIds.has(product.id)
+                          ? "bg-[#eaf2e4] text-[#1e6b42]"
+                          : "bg-white/90 text-[#4a5568] hover:text-[#1e6b42]"
+                      }`}
+                    >
+                      <Heart
+                        size={14}
+                        fill={wishlistedIds.has(product.id) ? "currentColor" : "none"}
+                      />
+                    </button>
                   </div>
 
                   <div className="px-4 py-4">
@@ -258,9 +423,11 @@ export default function MarketplacePage() {
           </div>
         ) : (
           <div className="text-center py-20 text-[#9aaa8a]">
-            <p className="text-[16px]">No produce found for "{search}"</p>
+            <p className="text-[16px]">
+              {dict.marketplace.noProduceFound.replace("{search}", search)}
+            </p>
             <p className="text-[13px] mt-1">
-              Try a different search or category.
+              {dict.marketplace.tryDifferent}
             </p>
           </div>
         )}

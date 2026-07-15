@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLanguage } from "@/context/LanguageContext";
 
 const images = [
   {
@@ -26,6 +27,8 @@ const images = [
 ];
 
 export default function RealFarmsSection() {
+  const { dict } = useLanguage();
+
   return (
     <section className="bg-white py-20">
       <div className="max-w-screen-xl mx-auto px-6 lg:px-12">
@@ -52,28 +55,26 @@ export default function RealFarmsSection() {
           {/* Right: Text */}
           <div className="flex flex-col gap-5">
             <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#7a8a6a]">
-              Meet the Growers
+              {dict.realFarms.eyebrow}
             </p>
 
             <h2
               className="text-[32px] sm:text-[44px] font-semibold leading-[1.1] text-[#1c2b1a]"
               style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
             >
-              Real farms.{" "}
-              <span className="font-normal italic text-[#4a5a42]">Real names.</span>
+              {dict.realFarms.titleMain}{" "}
+              <span className="font-normal italic text-[#4a5a42]">{dict.realFarms.titleItalic}</span>
             </h2>
 
             <p className="text-[15px] text-[#5a6a52] leading-[1.75] max-w-[420px]">
-              420+ independent farms list their daily harvest on AgriConnect. We verify
-              every grower, audit every claim, and make sure 85¢ of every dollar goes
-              back to the farm.
+              {dict.realFarms.description}
             </p>
 
             <Link
               href="/marketplace"
               className="inline-flex items-center gap-2 text-[14px] font-medium text-[#2d5a1b] underline underline-offset-4 hover:text-[#1e3d18] transition-colors w-fit mt-2"
             >
-              Browse our farmer collective →
+              {dict.realFarms.cta}
             </Link>
           </div>
 

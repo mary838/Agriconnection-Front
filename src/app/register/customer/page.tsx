@@ -3,17 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
-type Province = {
-  id: number;
-  name: string;
-  region?: string;
-};
+import { auth, customers, provinces as provincesApi, ApiError, type Province } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function CustomerRegisterPage() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -36,21 +31,14 @@ export default function CustomerRegisterPage() {
         setProvinceLoading(true);
         setError("");
 
-        const response = await fetch(`${API_URL}/provinces`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to load provinces: ${response.status}`);
-        }
-
-        const data: Province[] = await response.json();
+        const data = await provincesApi.list();
         setProvinces(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load provinces.");
+      } catch (err: unknown) {
+        const message =
+          err instanceof ApiError || err instanceof Error
+            ? err.message
+            : "Failed to load provinces.";
+        setError(message);
       } finally {
         setProvinceLoading(false);
       }
@@ -109,26 +97,13 @@ export default function CustomerRegisterPage() {
       setLoading(true);
       setError("");
 
-      const registerRes = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          role: "customer",
-          phone: form.phone,
-        }),
+      const registerData = await auth.register({
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role: "customer",
+        phone: form.phone,
       });
-
-      const registerData = await registerRes.json();
-
-      if (!registerRes.ok) {
-        throw new Error(registerData.message || "Register failed.");
-      }
 
       const token = registerData.accessToken;
       const user = registerData.user;
@@ -136,38 +111,25 @@ export default function CustomerRegisterPage() {
       if (!token) throw new Error("No access token returned.");
       if (!user?.id) throw new Error("No user ID returned.");
 
-      localStorage.setItem("access_token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      login(user, token);
 
-      const customerRes = await fetch(`${API_URL}/customers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          name: form.name.trim(),
-          phone: form.phone,
-          address: form.address.trim(),
-          district: form.district.trim(),
-          provinceId: Number(form.provinceId),
-        }),
+      const customerData = await customers.create({
+        userId: user.id,
+        name: form.name.trim(),
+        phone: form.phone,
+        address: form.address.trim(),
+        district: form.district.trim(),
+        provinceId: Number(form.provinceId),
       });
-
-      const customerData = await customerRes.json();
-
-      if (!customerRes.ok) {
-        throw new Error(
-          customerData.message || "Create customer profile failed."
-        );
-      }
 
       localStorage.setItem("customer", JSON.stringify(customerData));
       router.push("/dashboard/customer");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Something went wrong.";
+      setError(message);
     } finally {
       setLoading(false);
     }

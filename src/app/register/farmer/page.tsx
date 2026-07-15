@@ -3,17 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-type Province = {
-  id: number;
-  name: string;
-  region?: string;
-};
+import { auth, farmers, provinces as provincesApi, ApiError, type Province } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function FarmerRegisterPage() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -36,22 +31,14 @@ export default function FarmerRegisterPage() {
         setProvinceLoading(true);
         setError("");
 
-        const res = await fetch(`${API_URL}/provinces`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || "Failed to load provinces.");
-        }
-
+        const data = await provincesApi.list();
         setProvinces(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load provinces.");
+      } catch (err: unknown) {
+        const message =
+          err instanceof ApiError || err instanceof Error
+            ? err.message
+            : "Failed to load provinces.";
+        setError(message);
       } finally {
         setProvinceLoading(false);
       }
@@ -115,26 +102,13 @@ export default function FarmerRegisterPage() {
       setLoading(true);
       setError("");
 
-      const registerRes = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          role: "farmer",
-          phone: form.phone,
-        }),
+      const registerData = await auth.register({
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role: "farmer",
+        phone: form.phone,
       });
-
-      const registerData = await registerRes.json();
-
-      if (!registerRes.ok) {
-        throw new Error(registerData.message || "Register failed.");
-      }
 
       const token = registerData.accessToken;
       const user = registerData.user;
@@ -142,36 +116,33 @@ export default function FarmerRegisterPage() {
       if (!token) throw new Error("No access token returned.");
       if (!user?.id) throw new Error("No user ID returned.");
 
-      localStorage.setItem("access_token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      login(user, token);
 
-      const farmerRes = await fetch(`${API_URL}/farmers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          farmerCode: form.farmerCode.trim(),
-          userId: user.id,
-          provinceId: Number(form.provinceId),
-          phone: form.phone,
-          ...(form.telegramPhone ? { telegramPhone: form.telegramPhone } : {}),
-        }),
-      });
+      // /auth/register already creates the Farmer row (with a generated
+      // farmerCode and no province) when role is "farmer" — update that
+      // row instead of creating a second one, which would conflict on
+      // the unique userId constraint.
+      const existingFarmers = await farmers.list();
+      const createdFarmer = existingFarmers.find((item) => item.userId === user.id);
 
-      const farmerData = await farmerRes.json();
-
-      if (!farmerRes.ok) {
-        throw new Error(farmerData.message || "Create farmer profile failed.");
+      if (!createdFarmer) {
+        throw new Error("Farmer profile was not created. Please contact support.");
       }
+
+      const farmerData = await farmers.update(createdFarmer.id, {
+        farmerCode: form.farmerCode.trim(),
+        provinceId: Number(form.provinceId),
+      });
 
       localStorage.setItem("farmer", JSON.stringify(farmerData));
 
       router.push("/dashboard/farmer");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Something went wrong.";
+      setError(message);
     } finally {
       setLoading(false);
     }

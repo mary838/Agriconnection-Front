@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Lock, CheckCircle } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { auth, ApiError } from "@/lib/api";
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -29,26 +36,15 @@ export default function ResetPasswordPage() {
       setLoading(true);
       setError("");
 
-      const res = await fetch(`${API_URL}/auth/reset-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          newPassword,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Reset password failed.");
-      }
+      await auth.resetPassword({ token, newPassword });
 
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Something went wrong.";
+      setError(message);
     } finally {
       setLoading(false);
     }

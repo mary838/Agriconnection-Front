@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { auth, ApiError } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,19 +26,7 @@ export default function LoginPage() {
       setLoading(true);
       setError("");
 
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Login failed.");
-      }
+      const data = await auth.login({ email, password });
 
       const token = data.accessToken;
       const user = data.user;
@@ -45,21 +34,19 @@ export default function LoginPage() {
       if (!token) throw new Error("No access token returned.");
       if (!user) throw new Error("No user returned.");
 
-      if (remember) {
-        localStorage.setItem("access_token", token);
-      } else {
-        sessionStorage.setItem("access_token", token);
-      }
-
-      localStorage.setItem("user", JSON.stringify(user));
+      login(user, token, remember);
 
       const role = user.role?.toLowerCase();
 
       if (role === "admin") router.push("/dashboard/admin");
       else if (role === "farmer") router.push("/dashboard/farmer");
       else router.push("/dashboard/customer");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Something went wrong.";
+      setError(message);
     } finally {
       setLoading(false);
     }

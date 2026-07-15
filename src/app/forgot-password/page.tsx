@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { auth, ApiError } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -22,24 +21,16 @@ export default function ForgotPasswordPage() {
       setLoading(true);
       setError("");
 
-      const res = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to generate reset token.");
-      }
+      const data = await auth.forgotPassword({ email });
 
       setResetToken(data.resetToken || "");
       setSent(true);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Something went wrong.";
+      setError(message);
     } finally {
       setLoading(false);
     }
