@@ -1,49 +1,35 @@
+"use client";
+
 import Link from "next/link";
 import { CalendarDays, Package, Leaf } from "lucide-react";
-
-const boxes = [
-  {
-    name: "Sunrise Box",
-    cadence: "Weekly",
-    body: "A rotating mix of whatever's peaking that week — leafy greens, roots, and fruit picked within days of delivery.",
-  },
-  {
-    name: "Harvest Table Box",
-    cadence: "Bi-weekly",
-    body: "A larger spread built for households cooking most meals at home, sized for four to six people.",
-  },
-  {
-    name: "Single Farm Box",
-    cadence: "Monthly",
-    body: "Everything sourced from one farmer, so you get to know a single grower's soil, season, and specialties.",
-  },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function SeasonalBoxesPage() {
+  const { dict } = useLanguage();
+  const { seasonalPage } = dict;
+
   return (
     <div className="min-h-screen bg-[#faf9f6]">
       <div className="max-w-screen-xl mx-auto px-6 lg:px-12 py-12">
         <div className="mb-12 max-w-2xl">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#2d5a1b] mb-2">
-            Seasonal Boxes
+            {seasonalPage.eyebrow}
           </p>
 
           <h1
             className="text-[32px] sm:text-[44px] font-semibold text-[#1c2b1a] leading-tight mb-3"
             style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
           >
-            Let the season pick for you
+            {seasonalPage.title}
           </h1>
 
           <p className="text-[15px] text-[#7a8a6a] leading-relaxed">
-            Instead of browsing product by product, a seasonal box brings you whatever
-            is freshest right now, curated from nearby farms and delivered on a schedule
-            that suits your kitchen.
+            {seasonalPage.description}
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-16">
-          {boxes.map((box) => (
+          {seasonalPage.boxes.map((box) => (
             <div
               key={box.name}
               className="bg-white border border-[#ede8df] rounded-2xl p-6 flex flex-col gap-3"
@@ -69,10 +55,11 @@ export default function SeasonalBoxesPage() {
               <Package size={18} />
             </div>
             <div>
-              <p className="text-[15px] font-medium text-[#1c2b1a] mb-1">Packed to order</p>
+              <p className="text-[15px] font-medium text-[#1c2b1a] mb-1">
+                {seasonalPage.packedTitle}
+              </p>
               <p className="text-[13.5px] text-[#7a8a6a] leading-relaxed">
-                Boxes are assembled after farmers confirm what&apos;s ready to pick, so contents
-                shift naturally with the season.
+                {seasonalPage.packedBody}
               </p>
             </div>
           </div>
@@ -82,10 +69,11 @@ export default function SeasonalBoxesPage() {
               <Leaf size={18} />
             </div>
             <div>
-              <p className="text-[15px] font-medium text-[#1c2b1a] mb-1">No two weeks alike</p>
+              <p className="text-[15px] font-medium text-[#1c2b1a] mb-1">
+                {seasonalPage.varietyTitle}
+              </p>
               <p className="text-[13.5px] text-[#7a8a6a] leading-relaxed">
-                Expect variety — a box in spring looks very different from one in late
-                summer or harvest season.
+                {seasonalPage.varietyBody}
               </p>
             </div>
           </div>
@@ -97,11 +85,10 @@ export default function SeasonalBoxesPage() {
               className="text-[24px] sm:text-[28px] font-semibold text-white leading-tight mb-2"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              Seasonal boxes are coming soon
+              {seasonalPage.ctaTitle}
             </p>
             <p className="text-[14px] text-white/70 leading-relaxed">
-              We&apos;re rolling this out with our first group of farmers. In the meantime,
-              browse the full marketplace for what&apos;s fresh today.
+              {seasonalPage.ctaDescription}
             </p>
           </div>
 
@@ -109,7 +96,7 @@ export default function SeasonalBoxesPage() {
             href="/marketplace"
             className="bg-white text-[#1e3d18] text-[14px] font-medium px-6 py-3 rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shrink-0"
           >
-            Browse produce
+            {seasonalPage.browseProduce}
           </Link>
         </div>
       </div>

@@ -3,31 +3,34 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { ShoppingCart, Menu, X, Bell } from "lucide-react";
+import { ShoppingCart, Menu, X, Bell, Globe } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { notifications as notificationsApi, type Notification } from "@/lib/api";
-
-const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "Marketplace", href: "/marketplace" },
-  { label: "Farmer Portal", href: "/dashboard/farmer", role: "farmer" },
-  { label: "Admin", href: "/dashboard/admin", role: "admin" },
-  { label: "My Account", href: "/dashboard/customer", role: "customer" },
-];
+import { useLanguage } from "@/context/LanguageContext";
+import { useNotifications } from "@/context/NotificationContext";
+import { LANGUAGES } from "@/lib/i18n";
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
   const { count: cartCount } = useCart();
+  const { language, setLanguage, dict } = useLanguage();
+  const { unreadCount } = useNotifications();
+
+  const navLinks = [
+    { label: dict.nav.home, href: "/" },
+    { label: dict.nav.marketplace, href: "/marketplace" },
+    { label: dict.nav.farmerPortal, href: "/dashboard/farmer", role: "farmer" },
+    { label: dict.nav.admin, href: "/dashboard/admin", role: "admin" },
+    { label: dict.nav.myAccount, href: "/dashboard/customer", role: "customer" },
+  ];
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [notifItems, setNotifItems] = useState<Notification[]>([]);
-  const notifRef = useRef<HTMLDivElement>(null);
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -36,54 +39,14 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setNotifItems([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    notificationsApi
-      .mine()
-      .then((data) => {
-        if (!cancelled) setNotifItems(data);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false);
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
       }
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
-
-  const unreadCount = notifItems.filter((n) => !n.isRead).length;
-
-  const handleNotifClick = async (notif: Notification) => {
-    if (!notif.isRead) {
-      setNotifItems((prev) =>
-        prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
-      );
-      try {
-        await notificationsApi.markRead(notif.id);
-      } catch {}
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    setNotifItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    try {
-      await notificationsApi.markAllRead();
-    } catch {}
-  };
 
   const handleCartClick = (e: React.MouseEvent) => {
     if (!user) {
@@ -137,7 +100,7 @@ export default function Navbar() {
             })}
           </div>
 
-          <div className="flex-1 hidden md:block" />
+          <div className="flex-1" />
 
           <div className="flex items-center gap-3 shrink-0">
             {(!user || user.role === "customer") && (
@@ -156,62 +119,54 @@ export default function Navbar() {
               </Link>
             )}
 
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangOpen((v) => !v)}
+                className="flex items-center gap-1 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                aria-label={dict.nav.language}
+                title={dict.nav.language}
+              >
+                <Globe size={20} strokeWidth={1.8} />
+                <span className="hidden sm:inline text-[12.5px] font-medium uppercase">
+                  {language}
+                </span>
+              </button>
+
+              {langOpen && (
+                <div className="absolute right-0 top-full mt-2 w-40 bg-white/95 backdrop-blur-md border border-[#dce4d3] shadow-sm rounded-lg z-50 overflow-hidden">
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => {
+                        setLanguage(l.code);
+                        setLangOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-[13px] transition-colors hover:bg-[#e8eed8] ${
+                        language === l.code
+                          ? "text-[#2d5a1b] font-medium bg-[#f4faee]"
+                          : "text-[#4a5568]"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {user && (
-              <div className="relative" ref={notifRef}>
-                <button
-                  onClick={() => setNotifOpen((v) => !v)}
-                  className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
-                  aria-label={`Notifications, ${unreadCount} unread`}
-                >
-                  <Bell size={22} strokeWidth={1.8} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {notifOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white/95 backdrop-blur-md border border-[#dce4d3] shadow-sm rounded-lg z-50">
-                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e8eed8]">
-                      <span className="text-[13.5px] font-medium text-[#2d5a1b]">
-                        Notifications
-                      </span>
-                      {unreadCount > 0 && (
-                        <button
-                          onClick={handleMarkAllRead}
-                          className="text-[12px] text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-
-                    {notifItems.length === 0 ? (
-                      <p className="px-4 py-6 text-[13px] text-[#4a5568] text-center">
-                        No notifications yet.
-                      </p>
-                    ) : (
-                      notifItems.map((notif) => (
-                        <button
-                          key={notif.id}
-                          onClick={() => handleNotifClick(notif)}
-                          className={`w-full text-left px-4 py-2.5 border-b border-[#e8eed8] last:border-0 transition-colors hover:bg-[#e8eed8] ${
-                            notif.isRead ? "bg-white" : "bg-[#f4faee]"
-                          }`}
-                        >
-                          <p className="text-[13px] font-medium text-[#2d5a1b]">
-                            {notif.title}
-                          </p>
-                          <p className="text-[12.5px] text-[#4a5568] mt-0.5">
-                            {notif.message}
-                          </p>
-                        </button>
-                      ))
-                    )}
-                  </div>
+              <Link
+                href="/notifications"
+                className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                aria-label={`${dict.nav.notifications}, ${unreadCount} unread`}
+              >
+                <Bell size={22} strokeWidth={1.8} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                    {unreadCount}
+                  </span>
                 )}
-              </div>
+              </Link>
             )}
 
             {user ? (
@@ -219,7 +174,7 @@ export default function Navbar() {
                 <Link
                   href="/profile"
                   className="w-[34px] h-[34px] rounded-full bg-[#b8cfa8] ring-2 ring-[#c8d8b8] shrink-0 flex items-center justify-center text-[#2d5a1b] text-[13px] font-semibold"
-                  title="Profile"
+                  title={dict.nav.profile}
                 >
                   {initials}
                 </Link>
@@ -228,7 +183,7 @@ export default function Navbar() {
                   onClick={handleLogout}
                   className="hidden sm:block text-[13.5px] text-[#4a5568] hover:text-[#2d5a1b] transition-colors px-1"
                 >
-                  Log out
+                  {dict.nav.logOut}
                 </button>
               </>
             ) : (
@@ -237,7 +192,7 @@ export default function Navbar() {
                   href="/login"
                   className="hidden sm:block text-[13.5px] text-[#4a5568] hover:text-[#2d5a1b] transition-colors px-1"
                 >
-                  Sign in
+                  {dict.nav.signIn}
                 </Link>
 
                 <div className="w-[34px] h-[34px] rounded-full bg-[#e8eed8] ring-2 ring-[#c8d8b8] shrink-0" />
@@ -247,7 +202,7 @@ export default function Navbar() {
             <button
               className="md:hidden p-1.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label="Toggle menu"
+              aria-label={dict.nav.toggleMenu}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -283,7 +238,7 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className="text-sm py-2.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
               >
-                Profile ({user.email})
+                {dict.nav.profile} ({user.email})
               </Link>
 
               <button
@@ -293,7 +248,7 @@ export default function Navbar() {
                 }}
                 className="text-sm py-2.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors text-left"
               >
-                Log out
+                {dict.nav.logOut}
               </button>
             </>
           ) : (
@@ -302,9 +257,30 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
               className="text-sm py-2.5 text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
             >
-              Sign in
+              {dict.nav.signIn}
             </Link>
           )}
+
+          <div className="py-2.5 border-t border-[#e8eed8] mt-1">
+            <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#7a8a6a] mb-2">
+              {dict.nav.language}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => setLanguage(l.code)}
+                  className={`px-3 py-1.5 rounded-full text-[13px] transition-colors ${
+                    language === l.code
+                      ? "bg-[#1e3d18] text-white"
+                      : "bg-[#f0ece4] text-[#4a5568]"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </nav>

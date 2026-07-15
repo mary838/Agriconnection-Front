@@ -5,13 +5,13 @@ import { Search, Menu } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import { orders as ordersApi, ApiError, type Order } from "@/lib/api";
 
-const STATUS_OPTIONS = ["pending", "paid", "shipped", "delivered", "cancelled"];
+const STATUS_OPTIONS = ["pending", "processing", "completed", "delivered", "cancelled"];
 
 function statusBadgeClass(status: string) {
   const s = status.toLowerCase();
   if (s === "delivered") return "bg-[#eaf2e4] text-[#2d5a1b]";
   if (s === "cancelled") return "bg-[#fee2e2] text-[#b91c1c]";
-  if (s === "shipped" || s === "paid") return "bg-[#eef2ff] text-[#4338ca]";
+  if (s === "processing" || s === "completed") return "bg-[#eef2ff] text-[#4338ca]";
   return "bg-[#fef3e2] text-[#b45309]";
 }
 

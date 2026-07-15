@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import { useToast } from "@/context/ToastContext";
 import { orders as ordersApi, ApiError } from "@/lib/api";
 
 const DELIVERY_FEE = 4.5;
@@ -25,6 +26,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { cart, loading: cartLoading, clearCart } = useCart();
+  const { showToast } = useToast();
 
   const [selectedWindow, setSelectedWindow] = useState(0);
   const [address, setAddress] = useState({
@@ -74,11 +76,13 @@ export default function CheckoutPage() {
       const destinationAddress = `${address.street}, ${address.city} ${address.zip}`.trim();
       await ordersApi.checkout({ destinationAddress });
       await clearCart();
+      showToast("Order placed successfully!", "success");
       router.push("/dashboard/customer/orders");
     } catch (err: unknown) {
       const message =
         err instanceof ApiError || err instanceof Error ? err.message : "Failed to place order.";
       setError(message);
+      showToast(message, "error");
     } finally {
       setPlacing(false);
     }

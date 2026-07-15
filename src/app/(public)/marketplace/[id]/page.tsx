@@ -6,10 +6,11 @@ import Link from "next/link";
 import { Minus, Plus, Leaf, Truck, ShieldCheck, Heart } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
 import {
   products as productsApi,
   wishlists as wishlistsApi,
-  getToken,
   ApiError,
   categoryName,
   resolveImageUrl,
@@ -32,6 +33,8 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { addItem } = useCart();
+  const { language } = useLanguage();
+  const { showToast } = useToast();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [activeImg, setActiveImg] = useState(0);
@@ -51,12 +54,7 @@ export default function ProductDetailPage() {
         setLoading(true);
         setError("");
 
-        if (!getToken()) {
-          router.push(`/login?redirect=/marketplace/${productId}`);
-          return;
-        }
-
-        const data = await productsApi.get(productId);
+        const data = await productsApi.get(productId, language);
         setProduct(data);
       } catch (err: unknown) {
         const message =
@@ -70,7 +68,7 @@ export default function ProductDetailPage() {
     };
 
     fetchProduct();
-  }, [productId, router]);
+  }, [productId, router, language]);
 
   useEffect(() => {
     if (!user || user.role !== "customer") {
@@ -133,6 +131,7 @@ export default function ProductDetailPage() {
       setError("");
       await addItem(product.id, qty);
       setAdded(true);
+      showToast(`Added ${product.name} to basket`, "success");
       setTimeout(() => setAdded(false), 2000);
     } catch (err: unknown) {
       const message =
@@ -140,6 +139,7 @@ export default function ProductDetailPage() {
           ? err.message
           : "Failed to add to basket.";
       setError(message);
+      showToast(message, "error");
     } finally {
       setAdding(false);
     }
@@ -162,9 +162,11 @@ export default function ProductDetailPage() {
       if (wishlisted) {
         await wishlistsApi.removeByProduct(product.id);
         setWishlisted(false);
+        showToast(`Removed ${product.name} from wishlist`, "info");
       } else {
         await wishlistsApi.add({ productId: product.id });
         setWishlisted(true);
+        showToast(`Added ${product.name} to wishlist`, "success");
       }
     } catch (err: unknown) {
       const message =
@@ -172,6 +174,7 @@ export default function ProductDetailPage() {
           ? err.message
           : "Failed to update wishlist.";
       setError(message);
+      showToast(message, "error");
     } finally {
       setWishlistBusy(false);
     }

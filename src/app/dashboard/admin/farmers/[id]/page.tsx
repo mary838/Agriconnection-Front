@@ -14,6 +14,7 @@ import {
   type Farmer,
   type Product,
 } from "@/lib/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   VERIFIED: { color: "bg-[#eaf2e4] text-[#2d5a1b]", icon: <CheckCircle size={11} className="text-[#2d5a1b]" /> },
@@ -26,6 +27,7 @@ const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
 const defaultStatusStyle = { color: "bg-[#f0ece4] text-[#5a6a52]", icon: <Clock size={11} className="text-[#5a6a52]" /> };
 
 export default function AdminFarmerDetailPage() {
+  const { dict } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const farmerId = params.id as string;
@@ -48,14 +50,14 @@ export default function AdminFarmerDetailPage() {
         setFarmer(farmerData);
         setProducts(allProducts.filter((p) => p.farmerId === farmerId));
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to load farmer.");
+        setError(err instanceof ApiError ? err.message : dict.dashboard.shared.somethingWrong);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [farmerId]);
+  }, [farmerId, dict]);
 
   return (
     <div className="flex min-h-screen bg-[#f5f2eb]">
@@ -77,16 +79,16 @@ export default function AdminFarmerDetailPage() {
             className="inline-flex items-center gap-1.5 text-[13px] text-[#7a8a6a] hover:text-[#2d5a1b] transition-colors mb-6"
           >
             <ArrowLeft size={14} />
-            Back to farmers
+            {dict.dashboard.adminFarmerDetail.backToFarmers}
           </button>
 
           {loading ? (
             <div className="bg-white border border-[#ede8df] rounded-2xl p-10 text-center text-[13px] text-[#9aaa8a]">
-              Loading farmer…
+              {dict.dashboard.adminFarmerDetail.loadingFarmer}
             </div>
           ) : error || !farmer ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600 text-sm">
-              {error || "Farmer not found."}
+              {error || dict.dashboard.adminFarmerDetail.farmerNotFound}
             </div>
           ) : (
             <>

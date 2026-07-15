@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { MapPin, Phone, Send, ShieldCheck, ArrowLeft } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   farmers as farmersApi,
   products as productsApi,
-  getToken,
   ApiError,
   resolveImageUrl,
   categoryName,
@@ -17,7 +17,7 @@ import {
 
 export default function FarmerProfilePage() {
   const params = useParams();
-  const router = useRouter();
+  const { language } = useLanguage();
   const farmerId = params.id as string;
 
   const [farmer, setFarmer] = useState<Farmer | null>(null);
@@ -31,14 +31,9 @@ export default function FarmerProfilePage() {
         setLoading(true);
         setError("");
 
-        if (!getToken()) {
-          router.push(`/login?redirect=/farmers/${farmerId}`);
-          return;
-        }
-
         const [farmerData, allProducts] = await Promise.all([
           farmersApi.get(farmerId),
-          productsApi.list(),
+          productsApi.list(language),
         ]);
 
         setFarmer(farmerData);
@@ -55,7 +50,7 @@ export default function FarmerProfilePage() {
     };
 
     fetchData();
-  }, [farmerId, router]);
+  }, [farmerId, language]);
 
   if (loading) {
     return (

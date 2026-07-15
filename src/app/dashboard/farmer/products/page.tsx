@@ -2,45 +2,36 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
 import {
   profile as profileApi,
   farmers as farmersApi,
   products as productsApi,
-  inventory as inventoryApi,
   getToken,
   ApiError,
   resolveImageUrl,
+  totalStock,
   type User,
   type Farmer,
   type Product,
-  type Inventory,
 } from "@/lib/api";
 import FarmerSidebar from "@/components/FarmerSidebar";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function FarmerProductsPage() {
+  const { dict } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [farmer, setFarmer] = useState<Farmer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [inventoryByProduct, setInventoryByProduct] = useState<Map<string, Inventory>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const loadProducts = async (farmerId: string) => {
-    const [allProducts, allInventory] = await Promise.all([
-      productsApi.list(),
-      inventoryApi.list(),
-    ]);
+    const allProducts = await productsApi.list();
     const farmerProducts = allProducts.filter((product) => product.farmerId === farmerId);
     setProducts(farmerProducts);
-
-    const map = new Map<string, Inventory>();
-    for (const record of allInventory) {
-      if (farmerProducts.some((p) => p.id === record.productId)) {
-        map.set(record.productId, record);
-      }
-    }
-    setInventoryByProduct(map);
   };
 
   useEffect(() => {
@@ -78,7 +69,7 @@ export default function FarmerProductsPage() {
   }, []);
 
   const handleDelete = async (productId: string) => {
-    if (!confirm("Delete this product? This cannot be undone.")) return;
+    if (!confirm(dict.dashboard.farmerProducts.deleteConfirm)) return;
 
     try {
       setDeletingId(productId);
@@ -86,7 +77,9 @@ export default function FarmerProductsPage() {
       setProducts((prev) => prev.filter((p) => p.id !== productId));
     } catch (err: unknown) {
       const message =
-        err instanceof ApiError || err instanceof Error ? err.message : "Failed to delete product.";
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : dict.dashboard.farmerProducts.failedToDeleteProduct;
       setError(message);
     } finally {
       setDeletingId(null);
@@ -96,45 +89,63 @@ export default function FarmerProductsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4efe5] flex items-center justify-center text-[#102615]">
-        Loading products...
+        {dict.dashboard.farmerProducts.loading}
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#f4efe5] flex text-[#102615]">
-      <FarmerSidebar active="Products" user={user} farmer={farmer} />
+      <FarmerSidebar
+        active="Products"
+        user={user}
+        farmer={farmer}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <section className="flex-1 px-12 py-10">
+      <section className="flex-1 px-5 sm:px-8 md:px-12 py-6 sm:py-10">
+        <div className="md:hidden flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-[#102615] hover:text-[#1e6b42] transition-colors"
+          >
+            <Menu size={22} />
+          </button>
+          <p className="text-lg" style={{ fontFamily: "Georgia, serif" }}>
+            AgriConnect
+          </p>
+        </div>
+
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600 text-sm">
             {error}
           </div>
         )}
 
-        <div className="flex items-start justify-between gap-8 mb-12">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 sm:gap-8 mb-12">
           <div>
             <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
-              Catalog
+              {dict.dashboard.farmerProducts.eyebrow}
             </p>
-            <h1 className="text-[42px] leading-[0.95]" style={{ fontFamily: "Georgia, serif" }}>
-              Your products
+            <h1 className="text-[32px] sm:text-[42px] leading-[0.95]" style={{ fontFamily: "Georgia, serif" }}>
+              {dict.dashboard.farmerProducts.title}
             </h1>
           </div>
 
           <Link
             href="/dashboard/farmer/products/new"
-            className="rounded-full bg-[#174832] px-7 py-4 text-sm font-semibold text-white hover:bg-[#216343]"
+            className="rounded-full bg-[#174832] px-7 py-4 text-sm font-semibold text-white hover:bg-[#216343] self-start"
           >
-            + New product
+            {dict.dashboard.farmerProducts.newProduct}
           </Link>
         </div>
 
         {products.length === 0 ? (
           <p className="text-[#8a8174] text-sm">
-            No products yet.{" "}
+            {dict.dashboard.farmerProducts.noProductsYet}{" "}
             <Link href="/dashboard/farmer/products/new" className="text-[#1e6b42] font-semibold">
-              Add your first product
+              {dict.dashboard.farmerProducts.addFirstProduct}
             </Link>
             .
           </p>
@@ -144,7 +155,6 @@ export default function FarmerProductsPage() {
               <ProductRow
                 key={product.id}
                 product={product}
-                inventoryRecord={inventoryByProduct.get(product.id) || null}
                 onDelete={() => handleDelete(product.id)}
                 deleting={deletingId === product.id}
               />
@@ -158,15 +168,14 @@ export default function FarmerProductsPage() {
 
 function ProductRow({
   product,
-  inventoryRecord,
   onDelete,
   deleting,
 }: {
   product: Product;
-  inventoryRecord: Inventory | null;
   onDelete: () => void;
   deleting: boolean;
 }) {
+  const { dict } = useLanguage();
   const image = resolveImageUrl(
     product.images?.find((img) => img.isPrimary)?.imageUrl ||
       product.images?.[0]?.imageUrl ||
@@ -176,10 +185,10 @@ function ProductRow({
   const categoryLabel =
     typeof product.category === "string" ? product.category : product.category?.name;
 
-  const stock = inventoryRecord?.stockQty;
-  const low =
-    typeof stock === "number" &&
-    stock <= (inventoryRecord?.lowStockThreshold ?? 15);
+  const hasInventory = !!product.inventory?.length;
+  const stock = hasInventory ? totalStock(product) : undefined;
+  const lowStockThreshold = product.inventory?.[0]?.lowStockThreshold ?? 15;
+  const low = typeof stock === "number" && stock <= lowStockThreshold;
 
   return (
     <div className="bg-white rounded-3xl overflow-hidden border border-[#e6dfd2]">
@@ -192,9 +201,13 @@ function ProductRow({
         <div className="flex items-start justify-between">
           <div>
             <h3 style={{ fontFamily: "Georgia, serif" }}>{product.name}</h3>
-            <p className="text-[#8a8174] text-xs mt-1 capitalize">{categoryLabel || "Uncategorized"}</p>
+            <p className="text-[#8a8174] text-xs mt-1 capitalize">
+              {categoryLabel || dict.dashboard.farmerProducts.uncategorized}
+            </p>
             <p className={`text-sm mt-2 ${low ? "text-red-500 font-semibold" : "text-[#8a8174]"}`}>
-              {typeof stock === "number" ? `In stock: ${stock} units` : "Stock: N/A"}
+              {typeof stock === "number"
+                ? dict.dashboard.farmerProducts.inStockUnits.replace("{n}", String(stock))
+                : dict.dashboard.farmerProducts.stockNA}
             </p>
           </div>
 
@@ -207,7 +220,7 @@ function ProductRow({
             disabled={deleting}
             className="flex-1 rounded-full border border-red-200 text-red-600 py-2 text-sm font-semibold hover:border-red-400 disabled:opacity-60"
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {deleting ? dict.dashboard.shared.deleting : dict.dashboard.shared.delete}
           </button>
         </div>
       </div>

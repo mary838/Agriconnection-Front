@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, Menu, CheckCircle, Clock, XCircle } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import { farmers as farmersApi, ApiError, type Farmer } from "@/lib/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   VERIFIED: { color: "bg-[#eaf2e4] text-[#2d5a1b]", icon: <CheckCircle size={11} className="text-[#2d5a1b]" /> },
@@ -19,6 +20,7 @@ const defaultStatusStyle = { color: "bg-[#f0ece4] text-[#5a6a52]", icon: <Clock 
 const FILTERS = ["All", "Verified", "Pending", "Suspended"];
 
 export default function AdminFarmersPage() {
+  const { dict } = useLanguage();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,13 +28,20 @@ export default function AdminFarmersPage() {
   const [filter, setFilter] = useState("All");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const filterLabels: Record<string, string> = {
+    All: dict.dashboard.adminFarmers.filterAll,
+    Verified: dict.dashboard.adminFarmers.filterVerified,
+    Pending: dict.dashboard.adminFarmers.filterPending,
+    Suspended: dict.dashboard.adminFarmers.filterSuspended,
+  };
+
   useEffect(() => {
     farmersApi
       .list()
       .then(setFarmers)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load farmers."))
+      .catch((err) => setError(err instanceof ApiError ? err.message : dict.dashboard.adminFarmers.failedToLoadFarmers))
       .finally(() => setLoading(false));
-  }, []);
+  }, [dict]);
 
   const filteredFarmers = farmers.filter((f) => {
     const farmName = f.farmName || f.farmerCode;
@@ -63,10 +72,10 @@ export default function AdminFarmersPage() {
 
           <div className="mb-8">
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#2d5a1b] mb-1">
-              Admin Console
+              {dict.dashboard.shared.adminConsoleLabel}
             </p>
             <h1 className="text-[28px] sm:text-[38px] font-semibold text-[#1c2b1a] leading-tight" style={{ fontFamily: "Georgia, serif" }}>
-              Farmers
+              {dict.dashboard.adminFarmers.title}
             </h1>
           </div>
 
@@ -87,7 +96,7 @@ export default function AdminFarmersPage() {
                       filter === f ? "bg-[#1e3d18] text-white" : "bg-[#faf9f6] text-[#5a6a52] border border-[#e0dbd0]"
                     }`}
                   >
-                    {f}
+                    {filterLabels[f]}
                   </button>
                 ))}
               </div>
@@ -95,7 +104,7 @@ export default function AdminFarmersPage() {
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aaa8a]" />
                 <input
                   type="text"
-                  placeholder="Search farmers"
+                  placeholder={dict.dashboard.adminFarmers.searchFarmersPlaceholder}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9 pr-4 py-2 text-[13px] bg-[#faf9f6] border border-[#e0dbd0] rounded-full focus:outline-none focus:border-[#2d5a1b] transition-colors w-52"
@@ -107,7 +116,14 @@ export default function AdminFarmersPage() {
               <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-[#f0ece4]">
-                    {["FARM", "REGION", "PHONE", "JOINED", "STATUS", "ACTIONS"].map((h) => (
+                    {[
+                      dict.dashboard.adminFarmers.colFarm,
+                      dict.dashboard.adminFarmers.colRegion,
+                      dict.dashboard.adminFarmers.colPhone,
+                      dict.dashboard.adminFarmers.colJoined,
+                      dict.dashboard.adminFarmers.colStatus,
+                      dict.dashboard.adminFarmers.colActions,
+                    ].map((h) => (
                       <th key={h} className="text-left text-[10px] font-semibold tracking-[0.15em] text-[#9aaa8a] pb-3 pr-4">
                         {h}
                       </th>
@@ -118,13 +134,13 @@ export default function AdminFarmersPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={6} className="py-6 text-center text-[13px] text-[#9aaa8a]">
-                        Loading farmers…
+                        {dict.dashboard.adminFarmers.loadingFarmers}
                       </td>
                     </tr>
                   ) : filteredFarmers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-6 text-center text-[13px] text-[#9aaa8a]">
-                        No farmers found.
+                        {dict.dashboard.adminFarmers.noFarmersFound}
                       </td>
                     </tr>
                   ) : (
@@ -152,7 +168,7 @@ export default function AdminFarmersPage() {
                               href={`/dashboard/admin/farmers/${f.id}`}
                               className="text-[#2d5a1b] hover:underline"
                             >
-                              View →
+                              {dict.dashboard.adminFarmers.viewLink}
                             </Link>
                           </td>
                         </tr>

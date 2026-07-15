@@ -1,8 +1,12 @@
+"use client";
+
+import { Fragment } from "react";
 import { KeyRound, Globe, Webhook } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 const endpointGroups = [
   {
-    title: "Auth",
+    key: "groupAuth",
     endpoints: [
       { method: "POST", path: "/auth/register" },
       { method: "POST", path: "/auth/login" },
@@ -12,7 +16,7 @@ const endpointGroups = [
     ],
   },
   {
-    title: "Catalog",
+    key: "groupCatalog",
     endpoints: [
       { method: "GET", path: "/products" },
       { method: "GET", path: "/categories" },
@@ -21,7 +25,7 @@ const endpointGroups = [
     ],
   },
   {
-    title: "Commerce",
+    key: "groupCommerce",
     endpoints: [
       { method: "GET", path: "/orders" },
       { method: "GET", path: "/payments" },
@@ -31,7 +35,7 @@ const endpointGroups = [
     ],
   },
   {
-    title: "Account",
+    key: "groupAccount",
     endpoints: [
       { method: "GET", path: "/profile" },
       { method: "PUT", path: "/profile" },
@@ -39,7 +43,7 @@ const endpointGroups = [
       { method: "GET", path: "/notifications" },
     ],
   },
-];
+] as const;
 
 function methodColor(method: string) {
   if (method === "GET") return "bg-[#eaf2e4] text-[#1e6b42]";
@@ -48,26 +52,48 @@ function methodColor(method: string) {
   return "bg-[#fde8e8] text-[#c0392b]";
 }
 
+function renderWithCode(template: string, tokens: Record<string, string>) {
+  const parts = template.split(/(\{[a-zA-Z]+\})/g);
+  return parts.map((part, i) => {
+    const match = part.match(/^\{([a-zA-Z]+)\}$/);
+    if (match && tokens[match[1]] !== undefined) {
+      return (
+        <code key={i} className="text-[12.5px]">
+          {tokens[match[1]]}
+        </code>
+      );
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
+}
+
 export default function DocsPage() {
+  const { dict } = useLanguage();
+  const { docsPage } = dict;
+  const groupLabels: Record<string, string> = {
+    groupAuth: docsPage.groupAuth,
+    groupCatalog: docsPage.groupCatalog,
+    groupCommerce: docsPage.groupCommerce,
+    groupAccount: docsPage.groupAccount,
+  };
+
   return (
     <div className="min-h-screen bg-[#faf9f6]">
       <div className="max-w-screen-xl mx-auto px-6 lg:px-12 py-12">
         <div className="mb-12 max-w-2xl">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#2d5a1b] mb-2">
-            API Docs
+            {docsPage.eyebrow}
           </p>
 
           <h1
             className="text-[32px] sm:text-[44px] font-semibold text-[#1c2b1a] leading-tight mb-3"
             style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
           >
-            Build on AgriConnect
+            {docsPage.title}
           </h1>
 
           <p className="text-[15px] text-[#7a8a6a] leading-relaxed">
-            The AgriConnect API is a REST service returning JSON. It backs this
-            marketplace directly, so anything you can do in the app, you can do with a
-            request.
+            {docsPage.description}
           </p>
         </div>
 
@@ -76,7 +102,7 @@ export default function DocsPage() {
             <div className="w-10 h-10 rounded-full bg-[#eaf2e4] text-[#1e6b42] flex items-center justify-center">
               <Globe size={18} />
             </div>
-            <p className="text-[15px] font-medium text-[#1c2b1a]">Base URL</p>
+            <p className="text-[15px] font-medium text-[#1c2b1a]">{docsPage.baseUrlLabel}</p>
             <code className="text-[13px] text-[#4a5568] bg-[#faf9f6] border border-[#e0dbd0] rounded-lg px-3 py-2 w-fit">
               NEXT_PUBLIC_API_URL
             </code>
@@ -86,11 +112,12 @@ export default function DocsPage() {
             <div className="w-10 h-10 rounded-full bg-[#eaf2e4] text-[#1e6b42] flex items-center justify-center">
               <KeyRound size={18} />
             </div>
-            <p className="text-[15px] font-medium text-[#1c2b1a]">Authentication</p>
+            <p className="text-[15px] font-medium text-[#1c2b1a]">{docsPage.authLabel}</p>
             <p className="text-[13.5px] text-[#7a8a6a] leading-relaxed">
-              Log in via <code className="text-[12.5px]">/auth/login</code> and send the
-              returned token as <code className="text-[12.5px]">Authorization: Bearer
-              &lt;token&gt;</code> on every subsequent request.
+              {renderWithCode(docsPage.authBody, {
+                loginPath: "/auth/login",
+                authHeader: "Authorization: Bearer <token>",
+              })}
             </p>
           </div>
 
@@ -98,23 +125,24 @@ export default function DocsPage() {
             <div className="w-10 h-10 rounded-full bg-[#eaf2e4] text-[#1e6b42] flex items-center justify-center">
               <Webhook size={18} />
             </div>
-            <p className="text-[15px] font-medium text-[#1c2b1a]">Format</p>
+            <p className="text-[15px] font-medium text-[#1c2b1a]">{docsPage.formatLabel}</p>
             <p className="text-[13.5px] text-[#7a8a6a] leading-relaxed">
-              Requests and responses are JSON. Public catalog reads (
-              <code className="text-[12.5px]">/categories</code>,{" "}
-              <code className="text-[12.5px]">/provinces</code>) don&apos;t require a token.
+              {renderWithCode(docsPage.formatBody, {
+                categoriesPath: "/categories",
+                provincesPath: "/provinces",
+              })}
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {endpointGroups.map((group) => (
-            <div key={group.title} className="bg-white border border-[#ede8df] rounded-2xl p-6">
+            <div key={group.key} className="bg-white border border-[#ede8df] rounded-2xl p-6">
               <p
                 className="text-[16px] font-medium text-[#1c2b1a] mb-4"
                 style={{ fontFamily: "Georgia, serif" }}
               >
-                {group.title}
+                {groupLabels[group.key]}
               </p>
               <ul className="flex flex-col gap-2.5">
                 {group.endpoints.map((ep) => (

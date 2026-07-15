@@ -7,12 +7,13 @@ import {
 } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import { farmers as farmersApi, ApiError, type Farmer } from "@/lib/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 const stats = [
-  { label: "TOTAL PRODUCTS",  value: "2,418",  sub: "+126 vs last month", featured: false },
-  { label: "TOTAL CUSTOMERS", value: "8.4k",   sub: "+412 vs last month", featured: false },
-  { label: "TOTAL ORDERS",    value: "3,212",  sub: "+18% vs last month", featured: false },
-  { label: "TOTAL REVENUE",   value: "$84.2k", sub: "+22% vs last month", featured: true  },
+  { key: "products",  value: "2,418",  sub: "+126 vs last month", featured: false },
+  { key: "customers", value: "8.4k",   sub: "+412 vs last month", featured: false },
+  { key: "orders",    value: "3,212",  sub: "+18% vs last month", featured: false },
+  { key: "revenue",   value: "$84.2k", sub: "+22% vs last month", featured: true  },
 ];
 
 const salesData = [
@@ -42,19 +43,27 @@ const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
 const defaultStatusStyle = { color: "bg-[#f0ece4] text-[#5a6a52]", icon: <Clock size={11} className="text-[#5a6a52]" /> };
 
 export default function AdminDashboard() {
+  const { dict } = useLanguage();
   const [farmerSearch, setFarmerSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const statLabels: Record<string, string> = {
+    products: dict.dashboard.shared.statTotalProducts,
+    customers: dict.dashboard.shared.statTotalCustomers,
+    orders: dict.dashboard.shared.statTotalOrders,
+    revenue: dict.dashboard.shared.statTotalRevenue,
+  };
+
   useEffect(() => {
     farmersApi
       .list()
       .then(setFarmers)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load farmers."))
+      .catch((err) => setError(err instanceof ApiError ? err.message : dict.dashboard.adminFarmers.failedToLoadFarmers))
       .finally(() => setLoading(false));
-  }, []);
+  }, [dict]);
 
   const filteredFarmers = farmers.filter((f) => {
     const farmName = f.farmName || f.farmerCode;
@@ -91,11 +100,11 @@ export default function AdminDashboard() {
           {/* Header */}
           <div className="mb-8">
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#2d5a1b] mb-1">
-              Admin Console
+              {dict.dashboard.shared.adminConsoleLabel}
             </p>
             <h1 className="text-[28px] sm:text-[38px] font-semibold text-[#1c2b1a] leading-tight" style={{ fontFamily: "Georgia, serif" }}>
-              Platform overview{" "}
-              <span className="font-normal italic text-[#7a8a6a]">— this month</span>
+              {dict.dashboard.adminHome.title}{" "}
+              <span className="font-normal italic text-[#7a8a6a]">{dict.dashboard.adminHome.titleSuffix}</span>
             </h1>
           </div>
 
@@ -103,7 +112,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
             <div className="rounded-2xl p-4 sm:p-5 flex flex-col gap-2 bg-white border border-[#ede8df]">
               <p className="text-[10px] font-semibold tracking-[0.12em] text-[#9aaa8a]">
-                TOTAL FARMERS
+                {dict.dashboard.shared.statTotalFarmers}
               </p>
               <p
                 className="text-[24px] sm:text-[28px] font-semibold leading-none text-[#1c2b1a]"
@@ -112,18 +121,18 @@ export default function AdminDashboard() {
                 {loading ? "…" : farmers.length}
               </p>
               <p className="text-[11px] font-medium text-[#2d5a1b]">
-                {error ? "Failed to load" : "Live count"}
+                {error ? dict.dashboard.adminHome.failedToLoad : dict.dashboard.adminHome.liveCount}
               </p>
             </div>
             {stats.map((s) => (
               <div
-                key={s.label}
+                key={s.key}
                 className={`rounded-2xl p-4 sm:p-5 flex flex-col gap-2 ${
                   s.featured ? "bg-[#1e3d18]" : "bg-white border border-[#ede8df]"
                 }`}
               >
                 <p className={`text-[10px] font-semibold tracking-[0.12em] ${s.featured ? "text-white/50" : "text-[#9aaa8a]"}`}>
-                  {s.label}
+                  {statLabels[s.key]}
                 </p>
                 <p
                   className={`text-[24px] sm:text-[28px] font-semibold leading-none ${s.featured ? "text-white" : "text-[#1c2b1a]"}`}
@@ -146,14 +155,14 @@ export default function AdminDashboard() {
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
                 <div>
                   <h2 className="text-[18px] sm:text-[20px] font-semibold text-[#1c2b1a]" style={{ fontFamily: "Georgia, serif" }}>
-                    Monthly sales
+                    {dict.dashboard.adminHome.monthlySales}
                   </h2>
-                  <p className="text-[13px] text-[#9aaa8a]">Revenue across all farms</p>
+                  <p className="text-[13px] text-[#9aaa8a]">{dict.dashboard.adminHome.revenueAcrossFarms}</p>
                 </div>
                 <select className="text-[12px] border border-[#e0dbd0] rounded-full px-4 py-1.5 text-[#4a5568] bg-[#faf9f6] focus:outline-none cursor-pointer self-start">
-                  <option>Last 6 months</option>
-                  <option>Last 3 months</option>
-                  <option>This year</option>
+                  <option>{dict.dashboard.adminHome.last6Months}</option>
+                  <option>{dict.dashboard.adminHome.last3Months}</option>
+                  <option>{dict.dashboard.adminHome.thisYear}</option>
                 </select>
               </div>
 
@@ -178,9 +187,9 @@ export default function AdminDashboard() {
             {/* Top performers */}
             <div className="bg-white border border-[#ede8df] rounded-2xl p-5 sm:p-6">
               <h2 className="text-[18px] sm:text-[20px] font-semibold text-[#1c2b1a] mb-1" style={{ fontFamily: "Georgia, serif" }}>
-                Top performers
+                {dict.dashboard.adminHome.topPerformers}
               </h2>
-              <p className="text-[12px] text-[#9aaa8a] mb-5">Bestselling products</p>
+              <p className="text-[12px] text-[#9aaa8a] mb-5">{dict.dashboard.adminHome.bestsellingProducts}</p>
 
               <div className="flex flex-col gap-5">
                 {topPerformers.map((p) => (
@@ -209,16 +218,16 @@ export default function AdminDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
               <div>
                 <h2 className="text-[20px] sm:text-[22px] font-semibold text-[#1c2b1a]" style={{ fontFamily: "Georgia, serif" }}>
-                  Farmer accounts
+                  {dict.dashboard.adminHome.farmerAccounts}
                 </h2>
-                <p className="text-[13px] text-[#9aaa8a]">Manage growers and their products</p>
+                <p className="text-[13px] text-[#9aaa8a]">{dict.dashboard.adminHome.manageGrowers}</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aaa8a]" />
                   <input
                     type="text"
-                    placeholder="Search farmers"
+                    placeholder={dict.dashboard.adminHome.searchFarmersPlaceholder}
                     value={farmerSearch}
                     onChange={(e) => setFarmerSearch(e.target.value)}
                     className="pl-9 pr-4 py-2 text-[13px] bg-[#faf9f6] border border-[#e0dbd0] rounded-full focus:outline-none focus:border-[#2d5a1b] transition-colors w-44"
@@ -226,7 +235,7 @@ export default function AdminDashboard() {
                 </div>
                 <button className="flex items-center gap-2 px-4 sm:px-5 py-2 bg-[#1e3d18] text-white rounded-full text-[13px] font-medium hover:bg-[#2d5a1b] transition-colors whitespace-nowrap">
                   <Plus size={13} />
-                  Add farmer
+                  {dict.dashboard.adminHome.addFarmer}
                 </button>
               </div>
             </div>
@@ -236,7 +245,13 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[540px]">
                 <thead>
                   <tr className="border-b border-[#f0ece4]">
-                    {["FARM", "REGION", "PHONE", "STATUS", "ACTIONS"].map((h) => (
+                    {[
+                      dict.dashboard.adminHome.colFarm,
+                      dict.dashboard.adminHome.colRegion,
+                      dict.dashboard.adminHome.colPhone,
+                      dict.dashboard.adminHome.colStatus,
+                      dict.dashboard.adminHome.colActions,
+                    ].map((h) => (
                       <th key={h} className="text-left text-[10px] font-semibold tracking-[0.15em] text-[#9aaa8a] pb-3 pr-4">
                         {h}
                       </th>
@@ -247,7 +262,7 @@ export default function AdminDashboard() {
                   {loading ? (
                     <tr>
                       <td colSpan={5} className="py-6 text-center text-[13px] text-[#9aaa8a]">
-                        Loading farmers…
+                        {dict.dashboard.adminHome.loadingFarmers}
                       </td>
                     </tr>
                   ) : error ? (
@@ -259,7 +274,7 @@ export default function AdminDashboard() {
                   ) : filteredFarmers.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-6 text-center text-[13px] text-[#9aaa8a]">
-                        No farmers found.
+                        {dict.dashboard.adminHome.noFarmersFound}
                       </td>
                     </tr>
                   ) : (
@@ -284,7 +299,7 @@ export default function AdminDashboard() {
                               href={`/dashboard/admin/farmers/${f.id}`}
                               className="text-[#2d5a1b] hover:underline"
                             >
-                              View →
+                              {dict.dashboard.adminHome.viewLink}
                             </Link>
                           </td>
                         </tr>

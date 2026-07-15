@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Menu } from "lucide-react";
 import {
   profile as profileApi,
   farmers as farmersApi,
@@ -16,14 +17,17 @@ import {
   type Inventory,
 } from "@/lib/api";
 import FarmerSidebar from "@/components/FarmerSidebar";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function FarmerInventoryPage() {
+  const { dict } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [farmer, setFarmer] = useState<Farmer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventoryByProduct, setInventoryByProduct] = useState<Map<string, Inventory>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,16 +86,34 @@ export default function FarmerInventoryPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4efe5] flex items-center justify-center text-[#102615]">
-        Loading inventory...
+        {dict.dashboard.farmerInventory.loading}
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#f4efe5] flex text-[#102615]">
-      <FarmerSidebar active="Inventory" user={user} farmer={farmer} />
+      <FarmerSidebar
+        active="Inventory"
+        user={user}
+        farmer={farmer}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <section className="flex-1 px-12 py-10">
+      <section className="flex-1 px-5 sm:px-8 md:px-12 py-6 sm:py-10">
+        <div className="md:hidden flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-[#102615] hover:text-[#1e6b42] transition-colors"
+          >
+            <Menu size={22} />
+          </button>
+          <p className="text-lg" style={{ fontFamily: "Georgia, serif" }}>
+            AgriConnect
+          </p>
+        </div>
+
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600 text-sm">
             {error}
@@ -101,19 +123,19 @@ export default function FarmerInventoryPage() {
         <div className="flex items-start justify-between gap-8 mb-12">
           <div>
             <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
-              Stock
+              {dict.dashboard.farmerInventory.eyebrow}
             </p>
-            <h1 className="text-[42px] leading-[0.95]" style={{ fontFamily: "Georgia, serif" }}>
-              Inventory
+            <h1 className="text-[32px] sm:text-[42px] leading-[0.95]" style={{ fontFamily: "Georgia, serif" }}>
+              {dict.dashboard.farmerInventory.title}
             </h1>
           </div>
         </div>
 
         {products.length === 0 ? (
           <p className="text-[#8a8174] text-sm">
-            No products yet.{" "}
+            {dict.dashboard.farmerInventory.noProductsYet}{" "}
             <Link href="/dashboard/farmer/products/new" className="text-[#1e6b42] font-semibold">
-              Add your first product
+              {dict.dashboard.farmerInventory.addFirstProduct}
             </Link>
             .
           </p>
@@ -152,6 +174,7 @@ function InventoryRow({
   farmer: Farmer | null;
   onSaved: (record: Inventory) => void;
 }) {
+  const { dict } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [stockQty, setStockQty] = useState(String(inventoryRecord?.stockQty ?? ""));
   const [threshold, setThreshold] = useState(String(inventoryRecord?.lowStockThreshold ?? "20"));
@@ -173,7 +196,7 @@ function InventoryRow({
 
   const handleSave = async () => {
     if (!stockQty || !threshold) {
-      setRowError("Both fields are required.");
+      setRowError(dict.dashboard.farmerInventory.bothFieldsRequired);
       return;
     }
 
@@ -189,7 +212,7 @@ function InventoryRow({
         onSaved(updated);
       } else {
         if (!farmer?.provinceId) {
-          setRowError("Your farmer profile has no province set.");
+          setRowError(dict.dashboard.farmerInventory.noProvinceSet);
           return;
         }
         const created = await inventoryApi.create({
@@ -204,7 +227,9 @@ function InventoryRow({
       setEditing(false);
     } catch (err: unknown) {
       const message =
-        err instanceof ApiError || err instanceof Error ? err.message : "Failed to save inventory.";
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : dict.dashboard.farmerInventory.failedToSaveInventory;
       setRowError(message);
     } finally {
       setSaving(false);
@@ -212,27 +237,29 @@ function InventoryRow({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-[#e6dfd2] p-5 flex items-center gap-5">
-      <div
-        className="w-16 h-16 rounded-2xl bg-cover bg-center bg-[#e6dfd2] shrink-0"
-        style={image ? { backgroundImage: `url(${image})` } : undefined}
-      />
+    <div className="bg-white rounded-3xl border border-[#e6dfd2] p-5 flex flex-col sm:flex-row sm:items-center gap-5">
+      <div className="flex items-center gap-5 min-w-0">
+        <div
+          className="w-16 h-16 rounded-2xl bg-cover bg-center bg-[#e6dfd2] shrink-0"
+          style={image ? { backgroundImage: `url(${image})` } : undefined}
+        />
 
-      <div className="flex-1 min-w-0">
-        <h3 style={{ fontFamily: "Georgia, serif" }} className="truncate">
-          {product.name}
-        </h3>
-        <p className="text-[#8a8174] text-xs mt-1">
-          {inventoryRecord?.province?.name || farmer?.province?.name || "Province not set"}
-        </p>
-        {rowError && <p className="text-red-500 text-xs mt-1">{rowError}</p>}
+        <div className="flex-1 min-w-0">
+          <h3 style={{ fontFamily: "Georgia, serif" }} className="truncate">
+            {product.name}
+          </h3>
+          <p className="text-[#8a8174] text-xs mt-1">
+            {inventoryRecord?.province?.name || farmer?.province?.name || dict.dashboard.farmerInventory.provinceNotSet}
+          </p>
+          {rowError && <p className="text-red-500 text-xs mt-1">{rowError}</p>}
+        </div>
       </div>
 
       {editing ? (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div>
             <label className="block text-[10px] uppercase tracking-[0.14em] text-[#7a8a6a] mb-1">
-              Stock qty
+              {dict.dashboard.farmerInventory.stockQtyLabel}
             </label>
             <input
               type="number"
@@ -243,7 +270,7 @@ function InventoryRow({
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-[0.14em] text-[#7a8a6a] mb-1">
-              Low stock at
+              {dict.dashboard.farmerInventory.lowStockAtLabel}
             </label>
             <input
               type="number"
@@ -257,41 +284,45 @@ function InventoryRow({
             disabled={saving}
             className="rounded-full bg-[#174832] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#216343] disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? dict.dashboard.shared.saving : dict.dashboard.shared.save}
           </button>
           <button
             onClick={() => setEditing(false)}
             disabled={saving}
             className="rounded-full border border-[#e0dbd0] px-5 py-2.5 text-sm font-semibold hover:border-[#174832]"
           >
-            Cancel
+            {dict.dashboard.shared.cancel}
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           {inventoryRecord ? (
             <>
-              <div className="text-right">
-                <p className="font-semibold">{inventoryRecord.stockQty} units</p>
-                <p className="text-[#8a8174] text-xs mt-1">Low at {inventoryRecord.lowStockThreshold}</p>
+              <div className="text-left sm:text-right">
+                <p className="font-semibold">
+                  {inventoryRecord.stockQty} {dict.dashboard.farmerInventory.unitsSuffix}
+                </p>
+                <p className="text-[#8a8174] text-xs mt-1">
+                  {dict.dashboard.farmerInventory.lowAtPrefix} {inventoryRecord.lowStockThreshold}
+                </p>
               </div>
               <span
                 className={`text-[10px] font-bold rounded-full px-3 py-1 uppercase ${statusBadgeClass(
                   inventoryRecord.status
                 )}`}
               >
-                {inventoryRecord.status?.replace("_", " ") || "in stock"}
+                {inventoryRecord.status?.replace("_", " ") || dict.dashboard.farmerInventory.inStockDefault}
               </span>
             </>
           ) : (
-            <p className="text-[#8a8174] text-sm">No inventory record</p>
+            <p className="text-[#8a8174] text-sm">{dict.dashboard.farmerInventory.noInventoryRecord}</p>
           )}
 
           <button
             onClick={startEditing}
             className="rounded-full border border-[#e0dbd0] px-5 py-2.5 text-sm font-semibold hover:border-[#174832]"
           >
-            {inventoryRecord ? "Edit" : "Add stock"}
+            {inventoryRecord ? dict.dashboard.shared.edit : dict.dashboard.shared.addStock}
           </button>
         </div>
       )}

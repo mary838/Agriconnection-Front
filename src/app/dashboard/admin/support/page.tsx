@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Menu, Search } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, Menu, Search } from "lucide-react";
 import {
+  profile as profileApi,
   supportTickets as supportTicketsApi,
   ApiError,
   type SupportTicket,
 } from "@/lib/api";
 import AdminSidebar from "@/components/AdminSidebar";
+import SupportTicketThread from "@/components/SupportTicketThread";
 
 const STATUS_OPTIONS = ["open", "in_progress", "closed"];
 
@@ -25,12 +27,26 @@ export default function AdminSupportPage() {
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [ticketDetails, setTicketDetails] = useState<Record<string, SupportTicket>>({});
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [sendingReplyId, setSendingReplyId] = useState<string | null>(null);
+  const [replyErrors, setReplyErrors] = useState<Record<string, string>>({});
+
+  const fetchTickets = async () => {
+    const data = await supportTicketsApi.list();
+    setTickets(data);
+  };
 
   useEffect(() => {
-    const fetchTickets = async () => {
+    const load = async () => {
       try {
-        const data = await supportTicketsApi.list();
-        setTickets(data);
+        const profileData = await profileApi.get();
+        setCurrentUserId(profileData.id);
+        await fetchTickets();
       } catch (err: unknown) {
         const message =
           err instanceof ApiError || err instanceof Error
@@ -42,8 +58,57 @@ export default function AdminSupportPage() {
       }
     };
 
-    fetchTickets();
+    load();
   }, []);
+
+  const toggleTicket = async (ticketId: string) => {
+    if (expandedId === ticketId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(ticketId);
+    if (!ticketDetails[ticketId]) {
+      try {
+        setLoadingDetailId(ticketId);
+        const detail = await supportTicketsApi.get(ticketId);
+        setTicketDetails((prev) => ({ ...prev, [ticketId]: detail }));
+      } catch (err: unknown) {
+        const errMessage =
+          err instanceof ApiError || err instanceof Error
+            ? err.message
+            : "Failed to load conversation.";
+        setReplyErrors((prev) => ({ ...prev, [ticketId]: errMessage }));
+      } finally {
+        setLoadingDetailId(null);
+      }
+    }
+  };
+
+  const handleReply = async (ticketId: string) => {
+    const text = (replyDrafts[ticketId] || "").trim();
+    if (!text) return;
+
+    try {
+      setSendingReplyId(ticketId);
+      setReplyErrors((prev) => ({ ...prev, [ticketId]: "" }));
+      const reply = await supportTicketsApi.reply(ticketId, { message: text });
+      setTicketDetails((prev) => {
+        const existing = prev[ticketId];
+        if (!existing) return prev;
+        return { ...prev, [ticketId]: { ...existing, replies: [...(existing.replies || []), reply] } };
+      });
+      setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
+      await fetchTickets();
+    } catch (err: unknown) {
+      const errMessage =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Failed to send reply.";
+      setReplyErrors((prev) => ({ ...prev, [ticketId]: errMessage }));
+    } finally {
+      setSendingReplyId(null);
+    }
+  };
 
   const handleStatusChange = async (ticketId: string, status: string) => {
     try {
@@ -138,7 +203,7 @@ export default function AdminSupportPage() {
                 <table className="w-full min-w-[640px]">
                   <thead>
                     <tr className="border-b border-[#f0ece4]">
-                      {["SUBJECT", "REQUESTER", "CREATED", "STATUS"].map((h) => (
+                      {["SUBJECT", "REQUESTER", "CREATED", "STATUS", ""].map((h) => (
                         <th key={h} className="text-left text-[10px] font-semibold tracking-[0.15em] text-[#9aaa8a] pb-3 pr-4">
                           {h}
                         </th>
@@ -147,38 +212,85 @@ export default function AdminSupportPage() {
                   </thead>
                   <tbody>
                     {filteredTickets.map((ticket) => (
-                      <tr key={ticket.id} className="border-b border-[#f8f6f2] last:border-0 hover:bg-[#faf9f6] transition-colors">
-                        <td className="py-4 pr-4 max-w-[320px]">
-                          <p className="text-[14px] font-semibold text-[#1c2b1a]">{ticket.subject}</p>
-                          <p className="text-[12px] text-[#9aaa8a] truncate">{ticket.message}</p>
-                        </td>
-                        <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
-                          <p>{ticket.user?.name || "Unknown"}</p>
-                          <p className="text-[12px] text-[#9aaa8a]">{ticket.user?.email || ""}</p>
-                        </td>
-                        <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
-                          {new Date(ticket.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="py-4 pr-4">
-                          <select
-                            value={ticket.status}
-                            disabled={updatingId === ticket.id}
-                            onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
-                            className={`text-[11px] font-bold tracking-wide px-3 py-1.5 rounded-full whitespace-nowrap capitalize border-0 focus:outline-none disabled:opacity-60 ${statusBadgeClass(
-                              ticket.status
-                            )}`}
-                          >
-                            {!STATUS_OPTIONS.includes(ticket.status) && (
-                              <option value={ticket.status}>{ticket.status}</option>
-                            )}
-                            {STATUS_OPTIONS.map((status) => (
-                              <option key={status} value={status}>
-                                {status.replace("_", " ")}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
+                      <Fragment key={ticket.id}>
+                        <tr className="border-b border-[#f8f6f2] last:border-0 hover:bg-[#faf9f6] transition-colors">
+                          <td className="py-4 pr-4 max-w-[320px]">
+                            <p className="text-[14px] font-semibold text-[#1c2b1a]">{ticket.subject}</p>
+                            <p className="text-[12px] text-[#9aaa8a] truncate">{ticket.message}</p>
+                          </td>
+                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
+                            <p>{ticket.user?.name || "Unknown"}</p>
+                            <p className="text-[12px] text-[#9aaa8a]">{ticket.user?.email || ""}</p>
+                          </td>
+                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
+                            {new Date(ticket.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <select
+                              value={ticket.status}
+                              disabled={updatingId === ticket.id}
+                              onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
+                              className={`text-[11px] font-bold tracking-wide px-3 py-1.5 rounded-full whitespace-nowrap capitalize border-0 focus:outline-none disabled:opacity-60 ${statusBadgeClass(
+                                ticket.status
+                              )}`}
+                            >
+                              {!STATUS_OPTIONS.includes(ticket.status) && (
+                                <option value={ticket.status}>{ticket.status}</option>
+                              )}
+                              {STATUS_OPTIONS.map((status) => (
+                                <option key={status} value={status}>
+                                  {status.replace("_", " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-4 pr-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => toggleTicket(ticket.id)}
+                              className="flex items-center gap-1 text-[12px] font-semibold text-[#2d5a1b] hover:text-[#1c2b1a] transition-colors whitespace-nowrap ml-auto"
+                            >
+                              {expandedId === ticket.id ? (
+                                <>
+                                  Hide
+                                  <ChevronUp size={14} />
+                                </>
+                              ) : (
+                                <>
+                                  Reply
+                                  <ChevronDown size={14} />
+                                </>
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedId === ticket.id && (
+                          <tr className="border-b border-[#f8f6f2] last:border-0">
+                            <td colSpan={5} className="pb-5 px-1">
+                              <SupportTicketThread
+                                ticket={ticketDetails[ticket.id]}
+                                loading={loadingDetailId === ticket.id}
+                                currentUserId={currentUserId}
+                                draft={replyDrafts[ticket.id] || ""}
+                                onDraftChange={(value) =>
+                                  setReplyDrafts((prev) => ({ ...prev, [ticket.id]: value }))
+                                }
+                                onSubmit={() => handleReply(ticket.id)}
+                                submitting={sendingReplyId === ticket.id}
+                                error={replyErrors[ticket.id]}
+                                labels={{
+                                  noRepliesYet: "No replies yet.",
+                                  replyPlaceholder: "Write a reply...",
+                                  sendReply: "Send reply",
+                                  sending: "Sending...",
+                                  you: "You",
+                                  support: "Support",
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
 import {
   profile as profileApi,
   farmers as farmersApi,
@@ -20,8 +21,10 @@ import {
   type Inventory,
 } from "@/lib/api";
 import FarmerSidebar from "@/components/FarmerSidebar";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function FarmerDashboardPage() {
+  const { dict } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [farmer, setFarmer] = useState<Farmer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +33,7 @@ export default function FarmerDashboardPage() {
   const [revenue, setRevenue] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -102,7 +106,7 @@ export default function FarmerDashboardPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4efe5] flex items-center justify-center text-[#102615]">
-        Loading farmer dashboard...
+        {dict.dashboard.farmerHome.loading}
       </main>
     );
   }
@@ -112,85 +116,118 @@ export default function FarmerDashboardPage() {
   ).length;
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+  const greeting =
+    hour < 12
+      ? dict.dashboard.farmerHome.greetingMorning
+      : hour < 18
+      ? dict.dashboard.farmerHome.greetingAfternoon
+      : dict.dashboard.farmerHome.greetingEvening;
 
   return (
     <main className="min-h-screen bg-[#f4efe5] flex text-[#102615]">
-      <FarmerSidebar active="Overview" user={user} farmer={farmer} />
+      <FarmerSidebar
+        active="Overview"
+        user={user}
+        farmer={farmer}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <section className="flex-1 px-12 py-10">
+      <section className="flex-1 px-5 sm:px-8 md:px-12 py-6 sm:py-10">
+        <div className="md:hidden flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-[#102615] hover:text-[#1e6b42] transition-colors"
+          >
+            <Menu size={22} />
+          </button>
+          <p className="text-lg" style={{ fontFamily: "Georgia, serif" }}>
+            AgriConnect
+          </p>
+        </div>
+
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600 text-sm">
             {error}
           </div>
         )}
 
-        <div className="flex items-start justify-between gap-8 mb-12">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 sm:gap-8 mb-12">
           <div>
             <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
-              {greeting}, {user?.name?.split(" ")[0] || "Farmer"}
+              {greeting}, {user?.name?.split(" ")[0] || dict.dashboard.farmerHome.defaultFarmerName}
             </p>
 
             <h1
-              className="text-[50px] leading-[0.95]"
+              className="text-[32px] sm:text-[50px] leading-[0.95]"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              {user?.name || "Farmer"}
+              {user?.name || dict.dashboard.farmerHome.defaultFarmerName}
               <br />
               <em className="text-[#857d74] font-normal">
-                Performance overview
+                {dict.dashboard.farmerHome.performanceOverview}
               </em>
             </h1>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link
               href="/dashboard/farmer/reports"
               className="rounded-full bg-white border border-[#e1d8ca] px-7 py-4 text-sm font-semibold hover:border-[#174832]"
             >
-              View reports
+              {dict.dashboard.farmerHome.viewReports}
             </Link>
 
             <Link
               href="/dashboard/farmer/products/new"
               className="rounded-full bg-[#174832] px-7 py-4 text-sm font-semibold text-white hover:bg-[#216343]"
             >
-              + New product
+              {dict.dashboard.farmerHome.newProduct}
             </Link>
           </div>
         </div>
 
         <div className="grid md:grid-cols-4 gap-6 mb-14">
           <StatCard
-            title="Total revenue"
-            value={revenue !== null ? `$${revenue.toFixed(2)}` : "N/A"}
-            note="From payouts"
+            title={dict.dashboard.farmerHome.totalRevenue}
+            value={revenue !== null ? `$${revenue.toFixed(2)}` : dict.dashboard.shared.na}
+            note={dict.dashboard.farmerHome.fromPayouts}
           />
-          <StatCard title="Recent orders" value={String(recentOrders.length)} note={`${activeOrders} active`} />
-          <StatCard title="Products listed" value={String(products.length)} note="In your catalog" />
+          <StatCard
+            title={dict.dashboard.farmerHome.recentOrders}
+            value={String(recentOrders.length)}
+            note={`${activeOrders} ${dict.dashboard.farmerHome.activeSuffix}`}
+          />
+          <StatCard
+            title={dict.dashboard.farmerHome.productsListed}
+            value={String(products.length)}
+            note={dict.dashboard.farmerHome.inYourCatalog}
+          />
           <div className="rounded-[26px] bg-[#174832] text-white p-8 shadow-md">
-            <p className="text-[#9db79d] text-sm mb-5">Platform health</p>
+            <p className="text-[#9db79d] text-sm mb-5">{dict.dashboard.farmerHome.platformHealth}</p>
             <p
               className="text-[38px]"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              {farmer?.status === "active" ? "Optimal" : "Pending"}
+              {farmer?.status === "active" ? dict.dashboard.farmerHome.optimal : dict.dashboard.farmerHome.pendingWord}
             </p>
             <p className="text-[#c6dcc6] text-sm mt-2">
-              {farmer?.status === "active" ? "Verified farmer" : farmer?.status || "Pending farmer"}
+              {farmer?.status === "active"
+                ? dict.dashboard.farmerHome.verifiedFarmer
+                : farmer?.status || dict.dashboard.farmerHome.pendingFarmer}
             </p>
           </div>
         </div>
 
         {farmer && (
           <div className="grid md:grid-cols-4 gap-5 mb-12">
-            <InfoCard title="Farmer Code" value={farmer.farmerCode} />
-            <InfoCard title="Phone" value={farmer.phone || "N/A"} />
+            <InfoCard title={dict.dashboard.farmerHome.farmerCodeLabel} value={farmer.farmerCode} />
+            <InfoCard title={dict.dashboard.farmerHome.phoneLabel} value={farmer.phone || dict.dashboard.shared.na} />
             <InfoCard
-              title="Province"
-              value={farmer.province?.name || `Province ID ${farmer.provinceId}`}
+              title={dict.dashboard.farmerHome.provinceLabel}
+              value={farmer.province?.name || `${dict.dashboard.farmerHome.provinceIdPrefix} ${farmer.provinceId}`}
             />
-            <InfoCard title="Status" value={farmer.status} />
+            <InfoCard title={dict.dashboard.farmerHome.statusLabel} value={farmer.status} />
           </div>
         )}
 
@@ -201,22 +238,22 @@ export default function FarmerDashboardPage() {
                 className="text-[28px]"
                 style={{ fontFamily: "Georgia, serif" }}
               >
-                Current inventory
+                {dict.dashboard.farmerHome.currentInventory}
               </h2>
 
               <Link
                 href="/dashboard/farmer/products"
                 className="text-[#1e6b42] text-sm font-semibold"
               >
-                View catalog →
+                {dict.dashboard.farmerHome.viewCatalog}
               </Link>
             </div>
 
             {products.length === 0 ? (
               <p className="text-[#8a8174] text-sm">
-                No products yet.{" "}
+                {dict.dashboard.farmerHome.noProductsYet}{" "}
                 <Link href="/dashboard/farmer/products/new" className="text-[#1e6b42] font-semibold">
-                  Add your first product
+                  {dict.dashboard.farmerHome.addFirstProduct}
                 </Link>
                 .
               </p>
@@ -238,12 +275,12 @@ export default function FarmerDashboardPage() {
               className="text-[28px] mb-7"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              Incoming orders
+              {dict.dashboard.farmerHome.incomingOrders}
             </h2>
 
             <div className="flex flex-col gap-4 mb-10">
               {recentOrders.length === 0 ? (
-                <p className="text-[#8a8174] text-sm">No orders yet.</p>
+                <p className="text-[#8a8174] text-sm">{dict.dashboard.farmerHome.noOrdersYet}</p>
               ) : (
                 recentOrders.map((order) => <OrderRow key={order.orderId} order={order} />)
               )}
@@ -253,7 +290,7 @@ export default function FarmerDashboardPage() {
               href="/dashboard/farmer/reports"
               className="mt-6 flex items-center justify-center rounded-full bg-white border border-[#d8d0c3] py-4 text-sm font-semibold hover:border-[#174832]"
             >
-              See full analytics ↗
+              {dict.dashboard.farmerHome.seeFullAnalytics}
             </Link>
           </aside>
         </div>
@@ -303,6 +340,8 @@ function ProductCard({
   product: Product;
   inventoryRecord: Inventory | null;
 }) {
+  const { dict } = useLanguage();
+
   const image = resolveImageUrl(
     product.images?.find((img) => img.isPrimary)?.imageUrl ||
       product.images?.[0]?.imageUrl ||
@@ -336,7 +375,9 @@ function ProductCard({
                 low ? "text-red-500 font-semibold" : "text-[#8a8174]"
               }`}
             >
-              {typeof stock === "number" ? `In stock: ${stock} units` : categoryLabel || "—"}
+              {typeof stock === "number"
+                ? dict.dashboard.farmerHome.inStockUnits.replace("{n}", String(stock))
+                : categoryLabel || "—"}
             </p>
           </div>
 
@@ -348,7 +389,9 @@ function ProductCard({
 }
 
 function OrderRow({ order }: { order: FarmerOrderGroup }) {
-  const customer = order.customer?.name || "Customer";
+  const { dict } = useLanguage();
+
+  const customer = order.customer?.name || dict.dashboard.farmerHome.defaultCustomerName;
   const items = order.items.reduce(
     (sum, item) => sum + Number(item.quantity),
     0
@@ -359,7 +402,7 @@ function OrderRow({ order }: { order: FarmerOrderGroup }) {
   const title =
     productNames.length > 0
       ? productNames.join(", ")
-      : `Order #${order.orderId.slice(0, 8)}`;
+      : `${dict.dashboard.farmerHome.orderPrefix}${order.orderId.slice(0, 8)}`;
   const total = order.items.reduce(
     (sum, item) => sum + Number(item.subtotalUsd),
     0
@@ -377,7 +420,7 @@ function OrderRow({ order }: { order: FarmerOrderGroup }) {
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-[#102615] truncate">{title}</p>
         <p className="text-[#8a8174] text-sm">
-          {customer} · {items} item{items === 1 ? "" : "s"} · $
+          {customer} · {items} {items === 1 ? dict.dashboard.farmerHome.itemWord : dict.dashboard.farmerHome.itemWordPlural} · $
           {total.toFixed(2)}
         </p>
       </div>

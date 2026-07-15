@@ -142,11 +142,22 @@ export function categoryName(category: string | { id: number; name: string } | u
   return typeof category === "string" ? category : category.name;
 }
 
+export function categoryId(category: string | { id: number; name: string } | undefined): number | null {
+  if (!category || typeof category === "string") return null;
+  return category.id;
+}
+
 export function resolveImageUrl(path?: string | null): string {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
+
+export type ProductTranslation = {
+  locale: string;
+  name: string;
+  description?: string | null;
+};
 
 export type Product = {
   id: string;
@@ -161,6 +172,7 @@ export type Product = {
   stockQuantity?: number;
   status?: string;
   images?: ProductImage[];
+  translations?: ProductTranslation[];
   farmer?: Farmer;
   inventory?: Inventory[];
 };
@@ -315,6 +327,15 @@ export type Wishlist = {
   product?: Product;
 };
 
+export type SupportTicketReply = {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  message: string;
+  createdAt: string;
+  author?: User;
+};
+
 export type SupportTicket = {
   id: string;
   userId: string;
@@ -323,6 +344,7 @@ export type SupportTicket = {
   status: string;
   createdAt: string;
   user?: User;
+  replies?: SupportTicketReply[];
 };
 
 export type PublicStats = {
@@ -423,7 +445,8 @@ export type Category = {
 };
 
 export const categories = {
-  list: () => request<Category[]>("/categories", { auth: false }),
+  list: (locale?: string) =>
+    request<Category[]>(`/categories${locale ? `?lang=${locale}` : ""}`, { auth: false }),
 };
 
 // ---------- Products ----------
@@ -431,17 +454,24 @@ export const categories = {
 type ProductInput = {
   productCode: string;
   name: string;
+  description?: string;
   categoryId: number;
   farmerId: string;
   imageUrl?: string;
   priceUsd: number;
   unit: string;
   images?: ProductImage[];
+  translations?: ProductTranslation[];
+  provinceId?: number;
+  stockQty?: number;
+  lowStockThreshold?: number;
 };
 
 export const products = {
-  list: () => request<Product[]>("/products"),
-  get: (id: string) => request<Product>(`/products/${id}`),
+  list: (locale?: string) =>
+    request<Product[]>(`/products${locale ? `?lang=${locale}` : ""}`),
+  get: (id: string, locale?: string) =>
+    request<Product>(`/products/${id}${locale ? `?lang=${locale}` : ""}`),
   create: (body: ProductInput) => request<Product>("/products", { method: "POST", body }),
   update: (id: string, body: Partial<ProductInput>) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body }),
@@ -617,6 +647,8 @@ export const supportTickets = {
   list: () => request<SupportTicket[]>("/support-tickets"),
   mine: () => request<SupportTicket[]>("/support-tickets/me"),
   get: (id: string) => request<SupportTicket>(`/support-tickets/${id}`),
+  reply: (id: string, body: { message: string }) =>
+    request<SupportTicketReply>(`/support-tickets/${id}/replies`, { method: "POST", body }),
   updateStatus: (id: string, body: { status: string }) =>
     request<SupportTicket>(`/support-tickets/${id}/status`, { method: "PATCH", body }),
 };

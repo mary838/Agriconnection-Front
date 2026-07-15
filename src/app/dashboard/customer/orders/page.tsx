@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package } from "lucide-react";
+import { Menu, Package } from "lucide-react";
 import {
   profile as profileApi,
   customers as customersApi,
@@ -13,13 +13,16 @@ import {
   type Order,
 } from "@/lib/api";
 import CustomerSidebar from "@/components/CustomerSidebar";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function CustomerOrdersPage() {
+  const { dict } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,16 +58,34 @@ export default function CustomerOrdersPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4efe5] flex items-center justify-center text-[#102615]">
-        Loading orders...
+        {dict.dashboard.customerOrders.loading}
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#f4efe5] flex text-[#102615]">
-      <CustomerSidebar active="Orders" user={user} customer={customer} />
+      <CustomerSidebar
+        active="Orders"
+        user={user}
+        customer={customer}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <section className="flex-1 px-12 py-10">
+      <section className="flex-1 px-5 sm:px-8 md:px-12 py-6 sm:py-10">
+        <div className="md:hidden flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-[#102615] hover:text-[#1e6b42] transition-colors"
+          >
+            <Menu size={22} />
+          </button>
+          <p className="text-lg" style={{ fontFamily: "Georgia, serif" }}>
+            AgriConnect
+          </p>
+        </div>
+
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600 text-sm">
             {error}
@@ -72,14 +93,14 @@ export default function CustomerOrdersPage() {
         )}
 
         <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
-          Customer Portal
+          {dict.dashboard.shared.customerPortalLabel}
         </p>
         <h1 className="text-[42px] leading-[0.95] mb-10" style={{ fontFamily: "Georgia, serif" }}>
-          Your Orders
+          {dict.dashboard.customerOrders.title}
         </h1>
 
         {orders.length === 0 ? (
-          <p className="text-[#8a8174] text-sm">You haven&apos;t placed any orders yet.</p>
+          <p className="text-[#8a8174] text-sm">{dict.dashboard.customerOrders.noOrdersYet}</p>
         ) : (
           <div className="flex flex-col gap-4">
             {orders.map((order) => (
@@ -93,6 +114,7 @@ export default function CustomerOrdersPage() {
 }
 
 function OrderCard({ order }: { order: Order }) {
+  const { dict } = useLanguage();
   const raw = order as Record<string, unknown>;
   const total =
     (raw.totalAmountUsd as number | string | undefined) ??
@@ -108,9 +130,9 @@ function OrderCard({ order }: { order: Order }) {
       </div>
 
       <div className="flex-1">
-        <p className="font-semibold text-[#102615]">Order #{order.id.slice(0, 8)}</p>
+        <p className="font-semibold text-[#102615]">{dict.dashboard.customerOrders.orderPrefix}{order.id.slice(0, 8)}</p>
         <p className="text-[#8a8174] text-sm mt-1">
-          {order.destinationAddress || "No destination set"}
+          {order.destinationAddress || dict.dashboard.customerOrders.noDestination}
         </p>
         <p className="text-[#8a8174] text-xs mt-1">
           {new Date(placedAt).toLocaleString()}

@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { LanguageProvider } from "@/context/LanguageContext";
+import { ToastProvider } from "@/context/ToastContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import SplashScreen from "@/components/SplashScreen";
 
 const geistSans = Geist({
@@ -24,12 +27,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <AuthProvider>
-          <CartProvider>
-            <SplashScreen />
-            {children}
-          </CartProvider>
-        </AuthProvider>
+        <ToastProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <NotificationProvider>
+                <CartProvider>
+                  <SplashScreen />
+                  {children}
+                </CartProvider>
+                    </NotificationProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ToastProvider>
       </body>
     </html>
   );

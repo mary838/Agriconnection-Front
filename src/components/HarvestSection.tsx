@@ -3,18 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { products as productsApi, resolveImageUrl, type Product } from "@/lib/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=600&q=80";
 
 export default function HarvestSection() {
+  const { language, dict } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const data = await productsApi.list();
+        const data = await productsApi.list(language);
         setProducts(data.slice(0, 4));
       } catch {
         setProducts([]);
@@ -24,7 +26,7 @@ export default function HarvestSection() {
     };
 
     fetchProducts();
-  }, []);
+  }, [language]);
 
   return (
     <section className="bg-white py-16">
@@ -37,17 +39,17 @@ export default function HarvestSection() {
               className="text-[32px] font-semibold text-[#1c2b1a] leading-tight"
               style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
             >
-              This week's harvest
+              {dict.harvest.title}
             </h2>
             <p className="text-[14px] text-[#7a8a6a] mt-1">
-              Directly sourced, arriving in our hubs this morning.
+              {dict.harvest.subtitle}
             </p>
           </div>
           <Link
             href="/marketplace"
             className="text-[13.5px] font-medium text-[#2d5a1b] hover:underline whitespace-nowrap"
           >
-            View full inventory →
+            {dict.harvest.viewFullInventory}
           </Link>
         </div>
 
@@ -73,7 +75,7 @@ export default function HarvestSection() {
               const farmName =
                 product.farmer?.user?.name ||
                 product.farmer?.farmerCode ||
-                "Local Farmer";
+                dict.harvest.localFarmer;
 
               return (
                 <Link
@@ -109,7 +111,7 @@ export default function HarvestSection() {
                         ${Number(product.priceUsd).toFixed(2)}/{product.unit}
                       </p>
                     </div>
-                    <p className="text-[12px] text-[#7a8a6a] mt-1">by {farmName}</p>
+                    <p className="text-[12px] text-[#7a8a6a] mt-1">{dict.harvest.by} {farmName}</p>
                   </div>
                 </Link>
               );
@@ -117,7 +119,7 @@ export default function HarvestSection() {
           </div>
         ) : (
           <p className="text-[14px] text-[#7a8a6a] py-10 text-center">
-            No produce available right now.
+            {dict.harvest.noProduce}
           </p>
         )}
 

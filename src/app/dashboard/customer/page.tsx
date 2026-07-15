@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Heart, MapPin, Package, ShoppingBag } from "lucide-react";
+import { Heart, MapPin, Menu, Package, ShoppingBag } from "lucide-react";
 import {
   profile as profileApi,
   customers as customersApi,
@@ -19,9 +19,9 @@ import {
 } from "@/lib/api";
 import CustomerSidebar from "@/components/CustomerSidebar";
 import { useCart } from "@/context/CartContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const STEPS = ["pending", "paid", "shipped", "delivered"];
-const STEP_LABELS = ["Placed", "Paid", "Shipped", "Delivered"];
 
 function orderTotal(order: Order): number | null {
   const raw = order as Record<string, unknown>;
@@ -41,6 +41,13 @@ function statusBadgeClass(status: string) {
 }
 
 export default function CustomerDashboardPage() {
+  const { dict } = useLanguage();
+  const STEP_LABELS = [
+    dict.dashboard.customerHome.trackerPlaced,
+    dict.dashboard.customerHome.trackerPaid,
+    dict.dashboard.customerHome.trackerShipped,
+    dict.dashboard.customerHome.trackerDelivered,
+  ];
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -48,6 +55,7 @@ export default function CustomerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [movingToCart, setMovingToCart] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { refresh: refreshCart } = useCart();
 
   useEffect(() => {
@@ -119,7 +127,7 @@ export default function CustomerDashboardPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4efe5] flex items-center justify-center text-[#102615]">
-        Loading customer dashboard...
+        {dict.dashboard.customerHome.loading}
       </main>
     );
   }
@@ -139,9 +147,27 @@ export default function CustomerDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#f4efe5] flex text-[#102615]">
-      <CustomerSidebar active="Overview" user={user} customer={customer} />
+      <CustomerSidebar
+        active="Overview"
+        user={user}
+        customer={customer}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <section className="flex-1 px-12 py-10">
+      <section className="flex-1 px-5 sm:px-8 md:px-12 py-6 sm:py-10">
+        <div className="md:hidden flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-[#102615] hover:text-[#1e6b42] transition-colors"
+          >
+            <Menu size={22} />
+          </button>
+          <p className="text-lg" style={{ fontFamily: "Georgia, serif" }}>
+            AgriConnect
+          </p>
+        </div>
+
         {error && (
           <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-red-600 text-sm">
             {error}
@@ -149,27 +175,27 @@ export default function CustomerDashboardPage() {
         )}
 
         <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
-          Welcome Back
+          {dict.dashboard.customerHome.welcomeBack}
         </p>
 
         <h1
-          className="text-[48px] leading-tight mb-10"
+          className="text-[32px] sm:text-[48px] leading-tight mb-10"
           style={{ fontFamily: "Georgia, serif" }}
         >
-          Hello, {user?.name || "Customer"}.{" "}
-          <em className="text-[#857d74] font-normal">Hungry?</em>
+          {dict.dashboard.customerHome.helloPrefix} {user?.name || dict.dashboard.customerHome.defaultCustomerName}.{" "}
+          <em className="text-[#857d74] font-normal">{dict.dashboard.customerHome.hungry}</em>
         </h1>
 
         {customer && (
-          <div className="grid md:grid-cols-4 gap-5 mb-8">
-            <InfoCard title="Customer Name" value={customer.name} />
-            <InfoCard title="Phone" value={customer.phone || "N/A"} />
-            <InfoCard title="District" value={customer.district || "N/A"} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+            <InfoCard title={dict.dashboard.customerHome.customerNameLabel} value={customer.name} />
+            <InfoCard title={dict.dashboard.customerHome.phoneLabel} value={customer.phone || dict.dashboard.shared.na} />
+            <InfoCard title={dict.dashboard.customerHome.districtLabel} value={customer.district || dict.dashboard.shared.na} />
             <InfoCard
-              title="Province"
+              title={dict.dashboard.customerHome.provinceLabel}
               value={
                 customer.province?.name ||
-                (customer.provinceId ? `Province ID ${customer.provinceId}` : "N/A")
+                (customer.provinceId ? `${dict.dashboard.customerHome.provinceIdPrefix} ${customer.provinceId}` : dict.dashboard.shared.na)
               }
             />
           </div>
@@ -178,54 +204,54 @@ export default function CustomerDashboardPage() {
         {!customer && !error && (
           <div className="mb-8 rounded-3xl border border-[#e0dbd0] bg-white p-6">
             <h2 className="text-xl font-semibold text-[#1c2b1a] mb-2">
-              Customer profile not found
+              {dict.dashboard.customerHome.profileNotFoundTitle}
             </h2>
             <p className="text-[#7a8a6a] text-sm">
-              Your account exists, but no customer profile is connected yet.
+              {dict.dashboard.customerHome.profileNotFoundBody}
             </p>
           </div>
         )}
 
         {activeOrder ? (
-          <div className="bg-[#174832] rounded-[28px] p-8 text-white mb-10">
-            <div className="flex items-center justify-between">
+          <div className="bg-[#174832] rounded-[28px] p-6 sm:p-8 text-white mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
               <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
+                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
                   <Package size={28} />
                 </div>
 
                 <div>
                   <p className="text-[#9db79d] text-xs tracking-[0.18em] uppercase font-bold">
-                    Order #{activeOrder.id.slice(0, 8)} — {activeOrder.status}
+                    {dict.dashboard.customerHome.orderPrefix}{activeOrder.id.slice(0, 8)} — {activeOrder.status}
                   </p>
                   <h2
                     className="text-2xl mt-1 capitalize"
                     style={{ fontFamily: "Georgia, serif" }}
                   >
                     {activeOrder.status.toLowerCase() === "delivered"
-                      ? "Delivered"
+                      ? dict.dashboard.customerHome.delivered
                       : activeOrder.status.toLowerCase() === "cancelled"
-                      ? "Order cancelled"
-                      : "Order in progress"}
+                      ? dict.dashboard.customerHome.orderCancelled
+                      : dict.dashboard.customerHome.orderInProgress}
                   </h2>
 
                   <p className="flex items-center gap-1 text-[#b8c9b3] text-sm mt-2">
                     <MapPin size={14} />
-                    {activeOrder.destinationAddress || customer?.address || "No address yet"}
+                    {activeOrder.destinationAddress || customer?.address || dict.dashboard.customerHome.noAddressYet}
                   </p>
                 </div>
               </div>
 
               <Link
                 href="/dashboard/customer/orders"
-                className="rounded-full border border-white/30 px-6 py-3 text-sm hover:bg-white/10"
+                className="rounded-full border border-white/30 px-6 py-3 text-sm hover:bg-white/10 text-center"
               >
-                Track order
+                {dict.dashboard.customerHome.trackOrder}
               </Link>
             </div>
 
             {activeStepIndex >= 0 && (
-              <div className="grid grid-cols-4 gap-2 mt-9 text-xs text-[#b8c9b3]">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 gap-y-5 mt-9 text-xs text-[#b8c9b3]">
                 {STEP_LABELS.map((step, i) => (
                   <div key={step}>
                     <div
@@ -242,20 +268,20 @@ export default function CustomerDashboardPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-[28px] p-8 border border-[#e6dfd2] mb-10 flex items-center justify-between">
+          <div className="bg-white rounded-[28px] p-6 sm:p-8 border border-[#e6dfd2] mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div>
               <h2 className="text-2xl mb-1" style={{ fontFamily: "Georgia, serif" }}>
-                No orders yet
+                {dict.dashboard.customerHome.noOrdersTitle}
               </h2>
               <p className="text-[#8a8174] text-sm">
-                Browse the marketplace to place your first order.
+                {dict.dashboard.customerHome.noOrdersBody}
               </p>
             </div>
             <Link
               href="/marketplace"
-              className="rounded-full bg-[#174832] text-white px-6 py-3 text-sm font-semibold hover:bg-[#123a27]"
+              className="rounded-full bg-[#174832] text-white px-6 py-3 text-sm font-semibold hover:bg-[#123a27] text-center"
             >
-              Go to marketplace
+              {dict.dashboard.customerHome.goToMarketplace}
             </Link>
           </div>
         )}
@@ -267,16 +293,16 @@ export default function CustomerDashboardPage() {
                 className="text-2xl"
                 style={{ fontFamily: "Georgia, serif" }}
               >
-                Recent orders
+                {dict.dashboard.customerHome.recentOrdersTitle}
               </h2>
 
               <Link href="/dashboard/customer/orders" className="text-[#1e6b42] text-sm font-semibold">
-                View all
+                {dict.dashboard.shared.viewAll}
               </Link>
             </div>
 
             {recentOrders.length === 0 ? (
-              <p className="text-[#8a8174] text-sm">You haven&apos;t placed any orders yet.</p>
+              <p className="text-[#8a8174] text-sm">{dict.dashboard.customerHome.noOrdersInline}</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {recentOrders.map((order, i) => {
@@ -293,7 +319,7 @@ export default function CustomerDashboardPage() {
 
                         <div>
                           <p className="font-semibold text-[#102615]">
-                            Order #{order.id.slice(0, 8)}
+                            {dict.dashboard.customerHome.orderPrefix}{order.id.slice(0, 8)}
                           </p>
                           <p className="text-[#8a8174] text-sm">
                             {new Date(order.createdAt).toLocaleDateString()}
@@ -325,7 +351,7 @@ export default function CustomerDashboardPage() {
                 className="text-2xl"
                 style={{ fontFamily: "Georgia, serif" }}
               >
-                Wishlist
+                {dict.dashboard.customerHome.wishlistTitle}
               </h2>
 
               <Heart size={18} className="text-[#1e6b42]" />
@@ -334,7 +360,7 @@ export default function CustomerDashboardPage() {
             {wishlistPreview.length === 0 ? (
               <div className="flex flex-col items-center text-center py-8">
                 <ShoppingBag size={28} className="text-[#c9cdbf] mb-3" />
-                <p className="text-[#8a8174] text-sm">Nothing saved yet.</p>
+                <p className="text-[#8a8174] text-sm">{dict.dashboard.customerHome.nothingSavedYet}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-5">
@@ -357,7 +383,7 @@ export default function CustomerDashboardPage() {
 
                       <div className="flex-1">
                         <p className="font-semibold text-[#102615]">
-                          {product?.name || "Product"}
+                          {product?.name || dict.dashboard.customerHome.defaultProductName}
                         </p>
                         <p className="text-[#8a8174] text-sm italic">
                           {product?.farmer?.user?.name || product?.farmer?.farmerCode || ""}
@@ -379,7 +405,7 @@ export default function CustomerDashboardPage() {
               disabled={wishlist.length === 0 || movingToCart}
               className="w-full mt-8 rounded-full border border-[#d8d0c3] py-3 text-sm font-semibold hover:border-[#1e6b42] disabled:opacity-50"
             >
-              {movingToCart ? "Moving..." : "Move all to basket"}
+              {movingToCart ? dict.dashboard.customerHome.moving : dict.dashboard.customerHome.moveAllToBasket}
             </button>
           </section>
         </div>

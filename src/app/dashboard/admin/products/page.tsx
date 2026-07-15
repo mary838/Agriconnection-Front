@@ -5,17 +5,15 @@ import { Search, Menu } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import {
   products as productsApi,
-  inventory as inventoryApi,
   ApiError,
   categoryName,
   resolveImageUrl,
+  totalStock,
   type Product,
-  type Inventory,
 } from "@/lib/api";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [inventoryByProduct, setInventoryByProduct] = useState<Map<string, Inventory>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -24,17 +22,8 @@ export default function AdminProductsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [allProducts, allInventory] = await Promise.all([
-          productsApi.list(),
-          inventoryApi.list(),
-        ]);
+        const allProducts = await productsApi.list();
         setProducts(allProducts);
-
-        const map = new Map<string, Inventory>();
-        for (const record of allInventory) {
-          map.set(record.productId, record);
-        }
-        setInventoryByProduct(map);
       } catch (err: unknown) {
         setError(err instanceof ApiError || err instanceof Error ? err.message : "Failed to load products.");
       } finally {
@@ -132,9 +121,11 @@ export default function AdminProductsPage() {
                       const image = resolveImageUrl(
                         p.images?.find((img) => img.isPrimary)?.imageUrl || p.images?.[0]?.imageUrl || p.imageUrl
                       );
-                      const stockRecord = inventoryByProduct.get(p.id);
-                      const stock = stockRecord?.stockQty;
-                      const low = typeof stock === "number" && stock <= (stockRecord?.lowStockThreshold ?? 15);
+                      const stock = totalStock(p);
+                      const threshold = p.inventory?.length
+                        ? Number(p.inventory[0].lowStockThreshold)
+                        : 15;
+                      const low = stock <= threshold;
 
                       return (
                         <tr key={p.id} className="border-b border-[#f8f6f2] last:border-0 hover:bg-[#faf9f6] transition-colors">
@@ -158,7 +149,7 @@ export default function AdminProductsPage() {
                           </td>
                           <td className="py-4 pr-4 whitespace-nowrap">
                             <span className={`text-[13px] font-medium ${low ? "text-red-500" : "text-[#5a6a52]"}`}>
-                              {typeof stock === "number" ? stock : "—"}
+                              {stock}
                             </span>
                           </td>
                         </tr>

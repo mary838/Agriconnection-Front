@@ -2,23 +2,32 @@
 
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-
-const marketplace = [
-  { label: "Fresh Harvest", href: "/marketplace" },
-  { label: "Our Farmers", href: "/marketplace/farmers" },
-  { label: "Seasonal Boxes", href: "/marketplace/seasonal" },
-  { label: "Wholesale", href: "/marketplace/wholesale" },
-];
-
-const platform = [
-  { label: "Farmer Portal", href: "/dashboard/farmer", role: "farmer" },
-  { label: "Admin Console", href: "/dashboard/admin", role: "admin" },
-  { label: "API Docs", href: "/docs" },
-  { label: "Support", href: "/support" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function Footer() {
   const { user } = useAuth();
+  const { dict } = useLanguage();
+
+  const marketplace = [
+    { label: dict.footer.freshHarvest, href: "/marketplace" },
+    { label: dict.footer.ourFarmers, href: "/marketplace/farmers" },
+    { label: dict.footer.seasonalBoxes, href: "/marketplace/seasonal" },
+    { label: dict.footer.wholesale, href: "/marketplace/wholesale" },
+  ];
+
+  const platform = [
+    { label: dict.footer.farmerPortal, href: "/dashboard/farmer", role: "farmer" },
+    { label: dict.footer.adminConsole, href: "/dashboard/admin", role: "admin" },
+    { label: dict.footer.apiDocs, href: "/docs" },
+    { label: dict.footer.support, href: "/support" },
+  ];
+
+  const bottomLinks = [
+    { label: dict.footer.privacy, href: "/privacy" },
+    { label: dict.footer.terms, href: "/terms" },
+    { label: dict.footer.sustainability, href: "/sustainability" },
+  ];
+
   const visiblePlatformLinks = platform.filter(
     (link) => !link.role || !user || user.role === link.role
   );
@@ -39,15 +48,14 @@ export default function Footer() {
               AgriConnect
             </Link>
             <p className="text-[14px] text-white/50 leading-[1.75] max-w-[280px]">
-              A direct marketplace bridging local farmers and conscious consumers.
-              Honest soil, fair pricing, sunrise harvests.
+              {dict.footer.description}
             </p>
           </div>
 
           {/* Marketplace column */}
           <div className="flex flex-col gap-5">
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-white/40">
-              Marketplace
+              {dict.footer.marketplaceTitle}
             </p>
             <ul className="flex flex-col gap-3">
               {marketplace.map((link) => (
@@ -66,7 +74,7 @@ export default function Footer() {
           {/* Platform column */}
           <div className="flex flex-col gap-5">
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-white/40">
-              Platform
+              {dict.footer.platformTitle}
             </p>
             <ul className="flex flex-col gap-3">
               {visiblePlatformLinks.map((link) => (
@@ -89,16 +97,16 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="max-w-screen-xl mx-auto px-6 lg:px-12 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-[13px] text-white/35">
-            © 2026 AgriConnect. Grown with intent.
+            {dict.footer.copyright}
           </p>
           <div className="flex items-center gap-6">
-            {["Privacy", "Terms", "Sustainability"].map((item) => (
+            {bottomLinks.map((item) => (
               <Link
-                key={item}
-                href={`/${item.toLowerCase()}`}
+                key={item.href}
+                href={item.href}
                 className="text-[13px] text-white/40 hover:text-white/70 transition-colors"
               >
-                {item}
+                {item.label}
               </Link>
             ))}
           </div>
