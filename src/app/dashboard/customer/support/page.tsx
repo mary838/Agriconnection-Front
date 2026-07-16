@@ -190,7 +190,7 @@ export default function CustomerSupportPage() {
         <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
           {dict.dashboard.shared.customerPortalLabel}
         </p>
-        <h1 className="text-[42px] leading-[0.95] mb-10" style={{ fontFamily: "Georgia, serif" }}>
+        <h1 className="text-[32px] sm:text-[42px] leading-[0.95] mb-10" style={{ fontFamily: "Georgia, serif" }}>
           {dict.dashboard.customerSupport.title}
         </h1>
 

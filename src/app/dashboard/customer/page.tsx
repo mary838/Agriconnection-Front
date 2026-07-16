@@ -1,8 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Heart, MapPin, Menu, Package, ShoppingBag } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import {
+  Building2,
+  CheckCircle2,
+  CreditCard,
+  Heart,
+  MapPin,
+  Menu,
+  Package,
+  Phone,
+  ShoppingBag,
+  Truck,
+  User as UserIcon,
+  type LucideIcon,
+} from "lucide-react";
 import {
   profile as profileApi,
   customers as customersApi,
@@ -21,7 +34,13 @@ import CustomerSidebar from "@/components/CustomerSidebar";
 import { useCart } from "@/context/CartContext";
 import { useLanguage } from "@/context/LanguageContext";
 
-const STEPS = ["pending", "paid", "shipped", "delivered"];
+const STEPS = ["pending", "processing", "completed", "delivered"];
+const STEP_ICONS = [Package, CreditCard, Truck, CheckCircle2];
+
+function orderPlacedAt(order: Order): string {
+  const raw = order as Record<string, unknown>;
+  return (raw.placedAt as string | undefined) ?? order.createdAt;
+}
 
 function orderTotal(order: Order): number | null {
   const raw = order as Record<string, unknown>;
@@ -31,6 +50,13 @@ function orderTotal(order: Order): number | null {
     (raw.amountUsd as number | string | undefined) ??
     null;
   return total === null ? null : Number(total);
+}
+
+function formatStepDate(dateStr: string) {
+  const date = new Date(dateStr);
+  const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day}, ${time}`;
 }
 
 function statusBadgeClass(status: string) {
@@ -133,7 +159,7 @@ export default function CustomerDashboardPage() {
   }
 
   const sortedOrders = [...orders].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(orderPlacedAt(b)).getTime() - new Date(orderPlacedAt(a)).getTime()
   );
   const activeOrder =
     sortedOrders.find((o) => !["delivered", "cancelled"].includes(o.status.toLowerCase())) ||
@@ -188,10 +214,11 @@ export default function CustomerDashboardPage() {
 
         {customer && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-            <InfoCard title={dict.dashboard.customerHome.customerNameLabel} value={customer.name} />
-            <InfoCard title={dict.dashboard.customerHome.phoneLabel} value={customer.phone || dict.dashboard.shared.na} />
-            <InfoCard title={dict.dashboard.customerHome.districtLabel} value={customer.district || dict.dashboard.shared.na} />
+            <InfoCard icon={UserIcon} title={dict.dashboard.customerHome.customerNameLabel} value={customer.name} />
+            <InfoCard icon={Phone} title={dict.dashboard.customerHome.phoneLabel} value={customer.phone || dict.dashboard.shared.na} />
+            <InfoCard icon={MapPin} title={dict.dashboard.customerHome.districtLabel} value={customer.district || dict.dashboard.shared.na} />
             <InfoCard
+              icon={Building2}
               title={dict.dashboard.customerHome.provinceLabel}
               value={
                 customer.province?.name ||
@@ -251,19 +278,49 @@ export default function CustomerDashboardPage() {
             </div>
 
             {activeStepIndex >= 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 gap-y-5 mt-9 text-xs text-[#b8c9b3]">
-                {STEP_LABELS.map((step, i) => (
-                  <div key={step}>
-                    <div
-                      className={`h-1 rounded-full mb-3 ${
-                        i <= activeStepIndex ? "bg-white" : "bg-white/20"
-                      }`}
-                    />
-                    <p className={i <= activeStepIndex ? "text-white" : "text-white/40"}>
-                      {step}
-                    </p>
-                  </div>
-                ))}
+              <div className="mt-9">
+                <div className="flex items-center">
+                  {STEP_LABELS.map((step, i) => {
+                    const StepIcon = STEP_ICONS[i];
+                    return (
+                      <Fragment key={step}>
+                        <div
+                          className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${
+                            i <= activeStepIndex
+                              ? "bg-white border-white text-[#174832]"
+                              : "bg-white/10 border-white/20 text-white/40"
+                          }`}
+                        >
+                          <StepIcon size={18} strokeWidth={1.8} />
+                        </div>
+                        {i < STEP_LABELS.length - 1 && (
+                          <div
+                            className={`flex-1 h-0 border-t-2 border-dashed mx-1 ${
+                              i < activeStepIndex ? "border-white" : "border-white/20"
+                            }`}
+                          />
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+                <div className="flex items-start mt-3 text-xs text-[#b8c9b3]">
+                  {STEP_LABELS.map((step, i) => (
+                    <Fragment key={step}>
+                      <div className="w-11 shrink-0 text-center">
+                        <p className={i <= activeStepIndex ? "text-white" : "text-white/40"}>
+                          {step}
+                        </p>
+                        {i === activeStepIndex && (
+                          <p className="text-[11px] text-[#b8c9b3] mt-0.5">
+                            {formatStepDate(orderPlacedAt(activeOrder))}
+                          </p>
+                        )}
+                      </div>
+                      {i < STEP_LABELS.length - 1 && <div className="flex-1" />}
+                    </Fragment>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -310,10 +367,10 @@ export default function CustomerDashboardPage() {
                   return (
                     <div
                       key={order.id}
-                      className="flex items-center justify-between rounded-2xl border border-[#eee7dc] p-4"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-[#eee7dc] p-4"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-[#f1eadf] flex items-center justify-center text-[#7c715f] text-sm">
+                        <div className="w-12 h-12 rounded-full bg-[#f1eadf] flex items-center justify-center text-[#7c715f] text-sm shrink-0">
                           #{i + 1}
                         </div>
 
@@ -322,22 +379,24 @@ export default function CustomerDashboardPage() {
                             {dict.dashboard.customerHome.orderPrefix}{order.id.slice(0, 8)}
                           </p>
                           <p className="text-[#8a8174] text-sm">
-                            {new Date(order.createdAt).toLocaleDateString()}
+                            {new Date(orderPlacedAt(order)).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
 
-                      {total !== null && (
-                        <p className="text-[#102615]">${total.toFixed(2)}</p>
-                      )}
+                      <div className="flex items-center justify-between sm:justify-end gap-4 sm:ml-auto">
+                        {total !== null && (
+                          <p className="text-[#102615]">${total.toFixed(2)}</p>
+                        )}
 
-                      <span
-                        className={`text-[11px] font-bold rounded-full px-3 py-1 capitalize ${statusBadgeClass(
-                          order.status
-                        )}`}
-                      >
-                        {order.status}
-                      </span>
+                        <span
+                          className={`text-[11px] font-bold rounded-full px-3 py-1 capitalize shrink-0 ${statusBadgeClass(
+                            order.status
+                          )}`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -414,12 +473,23 @@ export default function CustomerDashboardPage() {
   );
 }
 
-function InfoCard({ title, value }: { title: string; value: string }) {
+function InfoCard({
+  icon: Icon,
+  title,
+  value,
+}: {
+  icon: LucideIcon;
+  title: string;
+  value: string;
+}) {
   return (
     <div className="rounded-3xl bg-white border border-[#e0dbd0] p-5">
-      <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-[#7a8a6a] mb-2">
-        {title}
-      </p>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={14} className="text-[#1e6b42]" />
+        <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-[#7a8a6a]">
+          {title}
+        </p>
+      </div>
       <p className="text-[#1c2b1a] font-semibold capitalize">{value}</p>
     </div>
   );

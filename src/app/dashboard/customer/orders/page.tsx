@@ -95,7 +95,7 @@ export default function CustomerOrdersPage() {
         <p className="text-[12px] tracking-[0.28em] uppercase text-[#1e6b42] font-bold mb-2">
           {dict.dashboard.shared.customerPortalLabel}
         </p>
-        <h1 className="text-[42px] leading-[0.95] mb-10" style={{ fontFamily: "Georgia, serif" }}>
+        <h1 className="text-[32px] sm:text-[42px] leading-[0.95] mb-10" style={{ fontFamily: "Georgia, serif" }}>
           {dict.dashboard.customerOrders.title}
         </h1>
 
@@ -124,28 +124,32 @@ function OrderCard({ order }: { order: Order }) {
   const placedAt = (raw.placedAt as string | undefined) ?? order.createdAt;
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-[#e6dfd2] flex items-center gap-6">
-      <div className="w-12 h-12 rounded-full bg-[#f1eadf] flex items-center justify-center text-[#7c715f] shrink-0">
-        <Package size={20} />
+    <div className="bg-white rounded-3xl p-6 border border-[#e6dfd2] flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-[#f1eadf] flex items-center justify-center text-[#7c715f] shrink-0">
+          <Package size={20} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-[#102615]">{dict.dashboard.customerOrders.orderPrefix}{order.id.slice(0, 8)}</p>
+          <p className="text-[#8a8174] text-sm mt-1">
+            {order.destinationAddress || dict.dashboard.customerOrders.noDestination}
+          </p>
+          <p className="text-[#8a8174] text-xs mt-1">
+            {new Date(placedAt).toLocaleString()}
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1">
-        <p className="font-semibold text-[#102615]">{dict.dashboard.customerOrders.orderPrefix}{order.id.slice(0, 8)}</p>
-        <p className="text-[#8a8174] text-sm mt-1">
-          {order.destinationAddress || dict.dashboard.customerOrders.noDestination}
-        </p>
-        <p className="text-[#8a8174] text-xs mt-1">
-          {new Date(placedAt).toLocaleString()}
-        </p>
+      <div className="flex items-center justify-between sm:justify-end gap-4 sm:ml-auto">
+        {total !== null && (
+          <p className="text-sm font-semibold text-[#102615]">${Number(total).toFixed(2)}</p>
+        )}
+
+        <span className="text-[11px] font-bold rounded-full px-3 py-1 bg-[#dff7ea] text-[#008454] capitalize shrink-0">
+          {order.status}
+        </span>
       </div>
-
-      {total !== null && (
-        <p className="text-sm font-semibold text-[#102615]">${Number(total).toFixed(2)}</p>
-      )}
-
-      <span className="text-[11px] font-bold rounded-full px-3 py-1 bg-[#dff7ea] text-[#008454] capitalize">
-        {order.status}
-      </span>
     </div>
   );
 }

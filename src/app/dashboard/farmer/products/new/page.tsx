@@ -193,7 +193,7 @@ export default function NewProductPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#faf8f3] px-8 py-10">
+    <main className="min-h-screen bg-[#faf8f3] px-4 sm:px-8 py-10">
       <div className="max-w-3xl mx-auto">
         <Link
           href="/dashboard/farmer"
@@ -207,7 +207,7 @@ export default function NewProductPage() {
         </p>
 
         <h1
-          className="text-[42px] text-[#1c2b1a] mb-8"
+          className="text-[32px] sm:text-[42px] text-[#1c2b1a] mb-8"
           style={{ fontFamily: "Georgia, serif" }}
         >
           {dict.dashboard.farmerNewProduct.title}

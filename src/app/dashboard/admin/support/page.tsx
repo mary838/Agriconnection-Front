@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Menu, Search } from "lucide-react";
 import {
   profile as profileApi,
@@ -199,101 +199,88 @@ export default function AdminSupportPage() {
             ) : filteredTickets.length === 0 ? (
               <p className="text-[13px] text-[#9aaa8a] py-6 text-center">No support tickets found.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]">
-                  <thead>
-                    <tr className="border-b border-[#f0ece4]">
-                      {["SUBJECT", "REQUESTER", "CREATED", "STATUS", ""].map((h) => (
-                        <th key={h} className="text-left text-[10px] font-semibold tracking-[0.15em] text-[#9aaa8a] pb-3 pr-4">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTickets.map((ticket) => (
-                      <Fragment key={ticket.id}>
-                        <tr className="border-b border-[#f8f6f2] last:border-0 hover:bg-[#faf9f6] transition-colors">
-                          <td className="py-4 pr-4 max-w-[320px]">
-                            <p className="text-[14px] font-semibold text-[#1c2b1a]">{ticket.subject}</p>
-                            <p className="text-[12px] text-[#9aaa8a] truncate">{ticket.message}</p>
-                          </td>
-                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
-                            <p>{ticket.user?.name || "Unknown"}</p>
-                            <p className="text-[12px] text-[#9aaa8a]">{ticket.user?.email || ""}</p>
-                          </td>
-                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
-                            {new Date(ticket.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="py-4 pr-4">
-                            <select
-                              value={ticket.status}
-                              disabled={updatingId === ticket.id}
-                              onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
-                              className={`text-[11px] font-bold tracking-wide px-3 py-1.5 rounded-full whitespace-nowrap capitalize border-0 focus:outline-none disabled:opacity-60 ${statusBadgeClass(
-                                ticket.status
-                              )}`}
-                            >
-                              {!STATUS_OPTIONS.includes(ticket.status) && (
-                                <option value={ticket.status}>{ticket.status}</option>
-                              )}
-                              {STATUS_OPTIONS.map((status) => (
-                                <option key={status} value={status}>
-                                  {status.replace("_", " ")}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-4 pr-2 text-right">
-                            <button
-                              type="button"
-                              onClick={() => toggleTicket(ticket.id)}
-                              className="flex items-center gap-1 text-[12px] font-semibold text-[#2d5a1b] hover:text-[#1c2b1a] transition-colors whitespace-nowrap ml-auto"
-                            >
-                              {expandedId === ticket.id ? (
-                                <>
-                                  Hide
-                                  <ChevronUp size={14} />
-                                </>
-                              ) : (
-                                <>
-                                  Reply
-                                  <ChevronDown size={14} />
-                                </>
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-                        {expandedId === ticket.id && (
-                          <tr className="border-b border-[#f8f6f2] last:border-0">
-                            <td colSpan={5} className="pb-5 px-1">
-                              <SupportTicketThread
-                                ticket={ticketDetails[ticket.id]}
-                                loading={loadingDetailId === ticket.id}
-                                currentUserId={currentUserId}
-                                draft={replyDrafts[ticket.id] || ""}
-                                onDraftChange={(value) =>
-                                  setReplyDrafts((prev) => ({ ...prev, [ticket.id]: value }))
-                                }
-                                onSubmit={() => handleReply(ticket.id)}
-                                submitting={sendingReplyId === ticket.id}
-                                error={replyErrors[ticket.id]}
-                                labels={{
-                                  noRepliesYet: "No replies yet.",
-                                  replyPlaceholder: "Write a reply...",
-                                  sendReply: "Send reply",
-                                  sending: "Sending...",
-                                  you: "You",
-                                  support: "Support",
-                                }}
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-col gap-4">
+                {filteredTickets.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="border border-[#f0ece4] rounded-xl p-4 sm:p-5 hover:bg-[#faf9f6] transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-semibold text-[#1c2b1a]">{ticket.subject}</p>
+                        <p className="text-[12px] text-[#9aaa8a] mt-0.5">{ticket.message}</p>
+                        <p className="text-[13px] text-[#5a6a52] mt-2">
+                          {ticket.user?.name || "Unknown"}
+                          {ticket.user?.email ? ` · ${ticket.user.email}` : ""}
+                        </p>
+                        <p className="text-[12px] text-[#9aaa8a] mt-0.5">
+                          {new Date(ticket.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <select
+                          value={ticket.status}
+                          disabled={updatingId === ticket.id}
+                          onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
+                          className={`text-[11px] font-bold tracking-wide px-3 py-1.5 rounded-full whitespace-nowrap capitalize border-0 focus:outline-none disabled:opacity-60 ${statusBadgeClass(
+                            ticket.status
+                          )}`}
+                        >
+                          {!STATUS_OPTIONS.includes(ticket.status) && (
+                            <option value={ticket.status}>{ticket.status}</option>
+                          )}
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status.replace("_", " ")}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleTicket(ticket.id)}
+                          className="flex items-center gap-1 text-[12px] font-semibold text-[#2d5a1b] hover:text-[#1c2b1a] transition-colors whitespace-nowrap"
+                        >
+                          {expandedId === ticket.id ? (
+                            <>
+                              Hide
+                              <ChevronUp size={14} />
+                            </>
+                          ) : (
+                            <>
+                              Reply
+                              <ChevronDown size={14} />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {expandedId === ticket.id && (
+                      <SupportTicketThread
+                        ticket={ticketDetails[ticket.id]}
+                        loading={loadingDetailId === ticket.id}
+                        currentUserId={currentUserId}
+                        draft={replyDrafts[ticket.id] || ""}
+                        onDraftChange={(value) =>
+                          setReplyDrafts((prev) => ({ ...prev, [ticket.id]: value }))
+                        }
+                        onSubmit={() => handleReply(ticket.id)}
+                        submitting={sendingReplyId === ticket.id}
+                        error={replyErrors[ticket.id]}
+                        labels={{
+                          noRepliesYet: "No replies yet.",
+                          replyPlaceholder: "Write a reply...",
+                          sendReply: "Send reply",
+                          sending: "Sending...",
+                          you: "You",
+                          support: "Support",
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

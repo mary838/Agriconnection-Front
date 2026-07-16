@@ -70,8 +70,8 @@ export default function Navbar() {
           : "bg-transparent border-b border-transparent"
       }`}
     >
-      <div className="max-w-screen-xl mx-auto px-6">
-        <div className="flex items-center h-[52px] gap-8">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center h-[52px] gap-3 sm:gap-8">
           <Link
             href="/"
             className="text-[#2d5a1b] font-semibold text-[17px] italic tracking-tight shrink-0 select-none"
@@ -102,7 +102,7 @@ export default function Navbar() {
 
           <div className="flex-1" />
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {(!user || user.role === "customer") && (
               <Link
                 href="/cart"
@@ -211,7 +211,7 @@ export default function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-[#dce4d3] bg-white/90 backdrop-blur-md px-6 py-3 flex flex-col">
+        <div className="md:hidden border-t border-[#dce4d3] bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 flex flex-col">
           {navLinks.map((link) => {
             if (link.role && user?.role !== link.role) return null;
 

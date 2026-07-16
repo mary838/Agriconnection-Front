@@ -210,7 +210,7 @@ export default function CartPage() {
             </div>
 
             {/* ── Order summary ── */}
-            <div className="bg-[#1e3d18] rounded-2xl p-7 sticky top-20">
+            <div className="bg-[#1e3d18] rounded-2xl p-7 lg:sticky lg:top-20">
               <h2
                 className="text-[24px] font-semibold text-white mb-6"
                 style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
