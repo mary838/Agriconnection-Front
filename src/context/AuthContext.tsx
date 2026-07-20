@@ -4,7 +4,12 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { usePathname } from "next/navigation";
 import { auth as authApi, clearToken, setToken } from "@/lib/api";
 
-export type AuthUser = { email: string; role: string };
+export type AuthUser = {
+  email: string;
+  role: string;
+  name?: string;
+  avatarUrl?: string | null;
+};
 
 type AuthCtx = {
   user: AuthUser | null;
@@ -35,7 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setUser(readStoredUser());
+    const stored = readStoredUser();
+    setUser((prev) => {
+      if (prev === stored) return prev;
+      if (
+        prev &&
+        stored &&
+        prev.email === stored.email &&
+        prev.role === stored.role &&
+        prev.name === stored.name &&
+        prev.avatarUrl === stored.avatarUrl
+      ) {
+        return prev;
+      }
+      return stored;
+    });
     setIsLoading(false);
   }, [pathname]);
 

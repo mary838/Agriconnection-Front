@@ -85,6 +85,9 @@ export type User = {
   role: Role;
   phone?: string | null;
   telegramPhone?: string | null;
+  avatarUrl?: string | null;
+  resetToken?: string | null;
+  resetTokenExpiry?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -104,7 +107,11 @@ export type Farmer = {
   provinceId: number;
   phone: string;
   telegramPhone?: string;
+  farmName?: string | null;
+  bio?: string | null;
+  address?: string | null;
   status: string;
+  verifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   province?: Province;
@@ -120,6 +127,7 @@ export type Customer = {
   address?: string;
   district?: string;
   provinceId?: number;
+  createdAt?: string;
   province?: Province;
 };
 
@@ -129,17 +137,44 @@ export type ProductImage = {
   isPrimary?: boolean;
 };
 
+export function categoryName(category: string | { id: number; name: string } | undefined): string {
+  if (!category) return "";
+  return typeof category === "string" ? category : category.name;
+}
+
+export function categoryId(category: string | { id: number; name: string } | undefined): number | null {
+  if (!category || typeof category === "string") return null;
+  return category.id;
+}
+
+export function resolveImageUrl(path?: string | null): string {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export type ProductTranslation = {
+  locale: string;
+  name: string;
+  description?: string | null;
+};
+
 export type Product = {
   id: string;
   productCode: string;
   name: string;
-  category: string;
+  description?: string | null;
+  category: string | { id: number; name: string };
   farmerId: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   priceUsd: number | string;
   unit: string;
+  stockQuantity?: number;
+  status?: string;
   images?: ProductImage[];
+  translations?: ProductTranslation[];
   farmer?: Farmer;
+  inventory?: Inventory[];
 };
 
 export type Inventory = {
@@ -148,9 +183,52 @@ export type Inventory = {
   provinceId: number;
   stockQty: number;
   lowStockThreshold: number;
+  status?: string;
   product?: Product;
   province?: Province;
 };
+
+export type FarmerOrderGroup = {
+  orderId: string;
+  orderCode: string;
+  status: string;
+  placedAt: string;
+  destinationAddress?: string | null;
+  customer?: Customer;
+  items: FarmerOrderItem[];
+};
+
+// Collapse a farmer's order items (one row per product) into one row per order.
+export function groupFarmerOrderItems(orderItems: FarmerOrderItem[]): FarmerOrderGroup[] {
+  const groups = new Map<string, FarmerOrderGroup>();
+  for (const item of orderItems) {
+    const existing = groups.get(item.orderId);
+    if (existing) {
+      existing.items.push(item);
+      continue;
+    }
+    groups.set(item.orderId, {
+      orderId: item.orderId,
+      orderCode: item.order.orderCode,
+      status: item.order.status,
+      placedAt: item.order.placedAt,
+      destinationAddress: item.order.destinationAddress,
+      customer: item.order.customer,
+      items: [item],
+    });
+  }
+  return Array.from(groups.values());
+}
+
+// Total remaining stock for a product, summed across every province's inventory row.
+export function totalStock(product: Pick<Product, "inventory">): number {
+  if (!product.inventory) return 0;
+  return product.inventory.reduce((sum, record) => sum + Number(record.stockQty), 0);
+}
+
+export function isOutOfStock(product: Pick<Product, "inventory">): boolean {
+  return totalStock(product) <= 0;
+}
 
 export type CartItem = {
   id: string;
@@ -171,6 +249,26 @@ export type Order = {
   createdAt: string;
   updatedAt: string;
   [key: string]: unknown;
+};
+
+export type FarmerOrderItem = {
+  id: string;
+  orderId: string;
+  productId: string;
+  farmerId: string;
+  quantity: number | string;
+  unitPriceUsd: number | string;
+  subtotalUsd: number | string;
+  order: {
+    id: string;
+    orderCode: string;
+    status: string;
+    destinationAddress?: string | null;
+    placedAt: string;
+    updatedAt: string;
+    customer?: Customer;
+  };
+  product?: Product;
 };
 
 export type Payment = {
@@ -229,6 +327,37 @@ export type Wishlist = {
   product?: Product;
 };
 
+export type SupportTicketReply = {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  message: string;
+  createdAt: string;
+  author?: User;
+};
+
+export type SupportTicket = {
+  id: string;
+  userId: string;
+  subject: string;
+  message: string;
+  status: string;
+  createdAt: string;
+  user?: User;
+  replies?: SupportTicketReply[];
+};
+
+export type PublicStats = {
+  activeFarms: number;
+  ordersFulfilled: number;
+  organicStandard: number;
+  latestHarvest: {
+    productName: string;
+    farmName: string;
+    harvestedAt: string;
+  } | null;
+};
+
 // ---------- Auth ----------
 
 export const auth = {
@@ -267,6 +396,15 @@ export const profile = {
   get: () => request<User>("/profile"),
   update: (body: Partial<Pick<User, "name" | "phone" | "telegramPhone">>) =>
     request<User>("/profile", { method: "PUT", body }),
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return request<User>("/profile/avatar", {
+      method: "POST",
+      body: formData,
+      isFormData: true,
+    });
+  },
 };
 
 // ---------- Farmers ----------
@@ -298,22 +436,42 @@ export const provinces = {
   remove: (id: number) => request<void>(`/provinces/${id}`, { method: "DELETE" }),
 };
 
+// ---------- Categories ----------
+
+export type Category = {
+  id: number;
+  name: string;
+  description?: string | null;
+};
+
+export const categories = {
+  list: (locale?: string) =>
+    request<Category[]>(`/categories${locale ? `?lang=${locale}` : ""}`, { auth: false }),
+};
+
 // ---------- Products ----------
 
 type ProductInput = {
   productCode: string;
   name: string;
-  category: string;
+  description?: string;
+  categoryId: number;
   farmerId: string;
   imageUrl?: string;
   priceUsd: number;
   unit: string;
   images?: ProductImage[];
+  translations?: ProductTranslation[];
+  provinceId?: number;
+  stockQty?: number;
+  lowStockThreshold?: number;
 };
 
 export const products = {
-  list: () => request<Product[]>("/products"),
-  get: (id: string) => request<Product>(`/products/${id}`),
+  list: (locale?: string) =>
+    request<Product[]>(`/products${locale ? `?lang=${locale}` : ""}`),
+  get: (id: string, locale?: string) =>
+    request<Product>(`/products/${id}${locale ? `?lang=${locale}` : ""}`),
   create: (body: ProductInput) => request<Product>("/products", { method: "POST", body }),
   update: (id: string, body: Partial<ProductInput>) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body }),
@@ -379,10 +537,16 @@ export const carts = {
 // ---------- Orders ----------
 
 export const orders = {
-  checkout: (body: { destinationAddress: string }) =>
-    request<Order>("/orders/checkout", { method: "POST", body }),
+  checkout: async (body: { destinationAddress: string }) => {
+    const res = await request<{ message: string; order: Order }>("/orders/checkout", {
+      method: "POST",
+      body,
+    });
+    return res.order;
+  },
   list: () => request<Order[]>("/orders"),
   mine: () => request<Order[]>("/orders/me"),
+  myFarmerItems: () => request<FarmerOrderItem[]>("/orders/farmer/me"),
   get: (id: string) => request<Order>(`/orders/${id}`),
   updateStatus: (id: string, body: { status: string }) =>
     request<Order>(`/orders/${id}/status`, { method: "PATCH", body }),
@@ -403,6 +567,11 @@ export const payments = {
   remove: (id: string) => request<void>(`/payments/${id}`, { method: "DELETE" }),
   updateStatus: (id: string, body: { status: string }) =>
     request<Payment>(`/payments/${id}/status`, { method: "PATCH", body }),
+  createCheckoutSession: (orderId: string) =>
+    request<{ url: string; sessionId: string }>("/payments/stripe/checkout-session", {
+      method: "POST",
+      body: { orderId },
+    }),
 };
 
 // ---------- Deliveries ----------
@@ -480,6 +649,26 @@ export const wishlists = {
     request<void>(`/wishlists/product/${productId}`, { method: "DELETE" }),
 };
 
+// ---------- Support Tickets ----------
+
+export const supportTickets = {
+  create: (body: { subject: string; message: string }) =>
+    request<SupportTicket>("/support-tickets", { method: "POST", body }),
+  list: () => request<SupportTicket[]>("/support-tickets"),
+  mine: () => request<SupportTicket[]>("/support-tickets/me"),
+  get: (id: string) => request<SupportTicket>(`/support-tickets/${id}`),
+  reply: (id: string, body: { message: string }) =>
+    request<SupportTicketReply>(`/support-tickets/${id}/replies`, { method: "POST", body }),
+  updateStatus: (id: string, body: { status: string }) =>
+    request<SupportTicket>(`/support-tickets/${id}/status`, { method: "PATCH", body }),
+};
+
+// ---------- Stats ----------
+
+export const stats = {
+  public: () => request<PublicStats>("/stats/public", { auth: false }),
+};
+
 const api = {
   auth,
   profile,
@@ -496,6 +685,8 @@ const api = {
   productReviews,
   notifications,
   wishlists,
+  supportTickets,
+  stats,
 };
 
 export default api;

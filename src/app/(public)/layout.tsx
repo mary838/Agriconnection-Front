@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <Navbar cartCount={3} />
+      <Navbar />
       <main>{children}</main>
       <Footer />
     </>

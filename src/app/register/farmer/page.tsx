@@ -118,12 +118,20 @@ export default function FarmerRegisterPage() {
 
       login(user, token);
 
-      const farmerData = await farmers.create({
+      // /auth/register already creates the Farmer row (with a generated
+      // farmerCode and no province) when role is "farmer" — update that
+      // row instead of creating a second one, which would conflict on
+      // the unique userId constraint.
+      const existingFarmers = await farmers.list();
+      const createdFarmer = existingFarmers.find((item) => item.userId === user.id);
+
+      if (!createdFarmer) {
+        throw new Error("Farmer profile was not created. Please contact support.");
+      }
+
+      const farmerData = await farmers.update(createdFarmer.id, {
         farmerCode: form.farmerCode.trim(),
-        userId: user.id,
         provinceId: Number(form.provinceId),
-        phone: form.phone,
-        ...(form.telegramPhone ? { telegramPhone: form.telegramPhone } : {}),
       });
 
       localStorage.setItem("farmer", JSON.stringify(farmerData));

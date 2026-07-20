@@ -1,56 +1,41 @@
 "use client";
 
 import Link from "next/link";
-
-const perspectives = [
-  {
-    number: "01",
-    title: "For Consumers",
-    description:
-      "Browse what's in season this week, follow your favorite farms, and track every order from harvest to doorstep.",
-    features: [
-      "Search & filter produce",
-      "Order tracking",
-      "Purchase history",
-      "Profile management",
-    ],
-    cta: "Customer dashboard →",
-    href: "/dashboard/customer",
-    featured: false,
-  },
-  {
-    number: "02",
-    title: "For Farmers",
-    description:
-      "Turn your harvest into a storefront. Manage inventory, fulfill orders, and watch your revenue grow.",
-    features: [
-      "Inventory management",
-      "Order fulfillment",
-      "Sales analytics",
-      "Pricing tools",
-    ],
-    cta: "Farmer portal →",
-    href: "/dashboard/farmer",
-    featured: true,
-  },
-  {
-    number: "03",
-    title: "For Administrators",
-    description:
-      "Govern the platform — verify growers, manage categories, and monitor every transaction in one console.",
-    features: [
-      "Farmer accounts",
-      "Order oversight",
-      "Revenue reports",
-      "Platform analytics",
-    ],
-    cta: "Admin console →",
-    href: "/dashboard/admin",
-    featured: false,
-  },
-];
+import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function PerspectivesSection() {
+  const { user } = useAuth();
+  const { dict } = useLanguage();
+
+  const perspectives = [
+    {
+      number: "01",
+      ...dict.perspectives.consumer,
+      href: "/dashboard/customer",
+      role: "customer",
+      featured: false,
+    },
+    {
+      number: "02",
+      ...dict.perspectives.farmer,
+      href: "/dashboard/farmer",
+      role: "farmer",
+      featured: true,
+    },
+    {
+      number: "03",
+      ...dict.perspectives.admin,
+      href: "/dashboard/admin",
+      role: "admin",
+      featured: false,
+    },
+  ];
+
+  const visiblePerspectives = user
+    ? perspectives.filter((p) => p.role === user.role)
+    : perspectives;
+
   return (
     <section className="bg-[#f5f2eb] py-20">
       <div className="max-w-screen-xl mx-auto px-6 lg:px-12">
@@ -58,19 +43,19 @@ export default function PerspectivesSection() {
         {/* Header */}
         <div className="mb-12">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#7a8a6a] mb-3">
-            Built for Three
+            {dict.perspectives.eyebrow}
           </p>
           <h2
             className="text-[28px] sm:text-[40px] font-semibold text-[#1c2b1a] leading-tight"
             style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
           >
-            One ecosystem, three perspectives.
+            {dict.perspectives.title}
           </h2>
         </div>
 
         {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
-          {perspectives.map((p) => (
+          {visiblePerspectives.map((p) => (
             <div
               key={p.number}
               className={`rounded-2xl flex flex-col p-8 ${

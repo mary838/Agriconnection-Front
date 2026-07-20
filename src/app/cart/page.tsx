@@ -1,70 +1,76 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Minus, Plus, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
+import { resolveImageUrl, ApiError, type CartItem } from "@/lib/api";
 
-const initialItems = [
-  {
-    id: 1,
-    name: "Heirloom Tomatoes",
-    farm: "Green Valley Farms",
-    unit: "2 lb",
-    priceEach: 9.0,
-    qty: 1,
-    image: "https://images.unsplash.com/photo-1582284540020-8acbe03f4924?w=300&q=80",
-  },
-  {
-    id: 2,
-    name: "Curly Green Kale",
-    farm: "Oak Ridge Farm",
-    unit: "2 bunches",
-    priceEach: 6.0,
-    qty: 1,
-    image: "https://images.unsplash.com/photo-1524179091875-bf99a9a6af57?w=300&q=80",
-  },
-  {
-    id: 3,
-    name: "Wildflower Honey",
-    farm: "Blackwood Apiary",
-    unit: "1 jar",
-    priceEach: 12.5,
-    qty: 1,
-    image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=300&q=80",
-  },
-];
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=300&q=80";
 
 const DELIVERY = 4.5;
+
+function farmName(item: CartItem) {
+  return item.product?.farmer?.user?.name || item.product?.farmer?.farmerCode || "Local Farmer";
+}
 
 export default function CartPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [items, setItems] = useState(initialItems);
+  const { cart, loading, updateItem, removeItem: removeCartItem } = useCart();
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (isLoading) return;
+    if (!user) {
       router.replace("/login?redirect=/cart");
+    } else if (user.role !== "customer") {
+      router.replace("/");
     }
   }, [user, isLoading, router]);
 
-  if (isLoading || !user) return null;
+  if (isLoading || !user || user.role !== "customer" || loading) return null;
 
-  const updateQty = (id: number, delta: number) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item
-      )
-    );
+  const items = cart?.items || [];
+
+  const runAction = async (id: string, action: () => Promise<void>) => {
+    try {
+      setBusyId(id);
+      setError("");
+      await action();
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError || err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const removeItem = (id: number) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const updateQty = (item: CartItem, delta: number) => {
+    const nextQty = Math.max(1, item.quantity + delta);
+    runAction(item.id, () => updateItem(item.id, nextQty));
   };
 
-  const subtotal = items.reduce((sum, i) => sum + i.priceEach * i.qty, 0);
+  const setQty = (item: CartItem, quantity: number) => {
+    const nextQty = Math.max(1, quantity);
+    if (nextQty === item.quantity) return;
+    runAction(item.id, () => updateItem(item.id, nextQty));
+  };
+
+  const removeItem = (item: CartItem) => {
+    runAction(item.id, () => removeCartItem(item.id));
+  };
+
+  const subtotal = items.reduce(
+    (sum, i) => sum + Number(i.product?.priceUsd || 0) * i.quantity,
+    0
+  );
   const total = subtotal + DELIVERY;
-  const farmCount = new Set(items.map((i) => i.farm)).size;
+  const farmCount = new Set(items.map((i) => farmName(i))).size;
 
   return (
     <div className="min-h-screen bg-[#faf9f6]">
@@ -83,6 +89,12 @@ export default function CartPage() {
           </p>
         </div>
 
+        {error && (
+          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-[18px] text-[#7a8a6a] mb-4">Your basket is empty.</p>
@@ -98,75 +110,107 @@ export default function CartPage() {
 
             {/* ── Cart items ── */}
             <div className="flex flex-col gap-3">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white border border-[#ede8df] rounded-2xl px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4"
-                >
-                  {/* Top row: image + info + mobile remove */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden bg-[#e8e0d0] shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="text-[15px] font-semibold text-[#1c2b1a]"
-                        style={{ fontFamily: "Georgia, serif" }}
-                      >
-                        {item.name}
-                      </p>
-                      <p className="text-[12px] text-[#7a8a6a] mt-0.5">{item.farm}</p>
-                      <p className="text-[12px] text-[#9aaa8a] mt-0.5">{item.unit}</p>
-                    </div>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="sm:hidden text-[#c8d0b8] hover:text-[#7a8a6a] transition-colors"
-                      aria-label="Remove item"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
+              {items.map((item) => {
+                const product = item.product;
+                const image = resolveImageUrl(
+                  product?.images?.find((img) => img.isPrimary)?.imageUrl ||
+                    product?.images?.[0]?.imageUrl ||
+                    product?.imageUrl
+                ) || FALLBACK_IMAGE;
+                const isBusy = busyId === item.id;
 
-                  {/* Bottom row: qty + price + desktop remove */}
-                  <div className="flex items-center gap-3 sm:ml-auto">
-                    <div className="flex items-center gap-3 border border-[#e0dbd0] rounded-full px-4 py-2 bg-white">
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-white border border-[#ede8df] rounded-2xl px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 ${
+                      isBusy ? "opacity-60" : ""
+                    }`}
+                  >
+                    {/* Top row: image + info + mobile remove */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden bg-[#e8e0d0] shrink-0">
+                        <img
+                          src={image}
+                          alt={product?.name || "Product"}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-[15px] font-semibold text-[#1c2b1a]"
+                          style={{ fontFamily: "Georgia, serif" }}
+                        >
+                          {product?.name || "Product"}
+                        </p>
+                        <p className="text-[12px] text-[#7a8a6a] mt-0.5">{farmName(item)}</p>
+                        <p className="text-[12px] text-[#9aaa8a] mt-0.5">{product?.unit}</p>
+                      </div>
                       <button
-                        onClick={() => updateQty(item.id, -1)}
-                        className="text-[#7a8a6a] hover:text-[#1c2b1a] transition-colors"
+                        onClick={() => removeItem(item)}
+                        disabled={isBusy}
+                        className="sm:hidden text-[#c8d0b8] hover:text-[#7a8a6a] transition-colors disabled:opacity-50"
+                        aria-label="Remove item"
                       >
-                        <Minus size={13} />
-                      </button>
-                      <span className="text-[14px] font-medium text-[#1c2b1a] min-w-[16px] text-center">
-                        {item.qty}
-                      </span>
-                      <button
-                        onClick={() => updateQty(item.id, 1)}
-                        className="text-[#7a8a6a] hover:text-[#1c2b1a] transition-colors"
-                      >
-                        <Plus size={13} />
+                        <X size={16} />
                       </button>
                     </div>
-                    <p className="text-[15px] font-semibold text-[#1c2b1a] min-w-[56px] text-right">
-                      ${(item.priceEach * item.qty).toFixed(2)}
-                    </p>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="hidden sm:block text-[#c8d0b8] hover:text-[#7a8a6a] transition-colors"
-                      aria-label="Remove item"
-                    >
-                      <X size={16} />
-                    </button>
+
+                    {/* Bottom row: qty + price + desktop remove */}
+                    <div className="flex items-center gap-3 sm:ml-auto">
+                      <div className="flex items-center gap-3 border border-[#e0dbd0] rounded-full px-4 py-2 bg-white">
+                        <button
+                          onClick={() => updateQty(item, -1)}
+                          disabled={isBusy}
+                          className="text-[#7a8a6a] hover:text-[#1c2b1a] transition-colors disabled:opacity-50"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <input
+                          key={item.quantity}
+                          type="number"
+                          min={1}
+                          defaultValue={item.quantity}
+                          disabled={isBusy}
+                          onBlur={(e) => {
+                            const value = Number(e.target.value);
+                            if (!value || Number.isNaN(value)) {
+                              e.target.value = String(item.quantity);
+                              return;
+                            }
+                            setQty(item, value);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                          className="w-10 text-[14px] font-medium text-[#1c2b1a] text-center bg-transparent focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                        <button
+                          onClick={() => updateQty(item, 1)}
+                          disabled={isBusy}
+                          className="text-[#7a8a6a] hover:text-[#1c2b1a] transition-colors disabled:opacity-50"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                      <p className="text-[15px] font-semibold text-[#1c2b1a] min-w-[56px] text-right">
+                        ${(Number(product?.priceUsd || 0) * item.quantity).toFixed(2)}
+                      </p>
+                      <button
+                        onClick={() => removeItem(item)}
+                        disabled={isBusy}
+                        className="hidden sm:block text-[#c8d0b8] hover:text-[#7a8a6a] transition-colors disabled:opacity-50"
+                        aria-label="Remove item"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* ── Order summary ── */}
-            <div className="bg-[#1e3d18] rounded-2xl p-7 sticky top-20">
+            <div className="bg-[#1e3d18] rounded-2xl p-7 lg:sticky lg:top-20">
               <h2
                 className="text-[24px] font-semibold text-white mb-6"
                 style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
