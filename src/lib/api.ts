@@ -537,8 +537,13 @@ export const carts = {
 // ---------- Orders ----------
 
 export const orders = {
-  checkout: (body: { destinationAddress: string }) =>
-    request<Order>("/orders/checkout", { method: "POST", body }),
+  checkout: async (body: { destinationAddress: string }) => {
+    const res = await request<{ message: string; order: Order }>("/orders/checkout", {
+      method: "POST",
+      body,
+    });
+    return res.order;
+  },
   list: () => request<Order[]>("/orders"),
   mine: () => request<Order[]>("/orders/me"),
   myFarmerItems: () => request<FarmerOrderItem[]>("/orders/farmer/me"),
@@ -562,6 +567,11 @@ export const payments = {
   remove: (id: string) => request<void>(`/payments/${id}`, { method: "DELETE" }),
   updateStatus: (id: string, body: { status: string }) =>
     request<Payment>(`/payments/${id}/status`, { method: "PATCH", body }),
+  createCheckoutSession: (orderId: string) =>
+    request<{ url: string; sessionId: string }>("/payments/stripe/checkout-session", {
+      method: "POST",
+      body: { orderId },
+    }),
 };
 
 // ---------- Deliveries ----------

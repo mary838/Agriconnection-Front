@@ -8,7 +8,7 @@ import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
-import { orders as ordersApi, ApiError } from "@/lib/api";
+import { orders as ordersApi, payments as paymentsApi, ApiError } from "@/lib/api";
 
 const DELIVERY_FEE = 4.5;
 
@@ -25,7 +25,7 @@ const inputClass =
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { cart, loading: cartLoading, clearCart } = useCart();
+  const { cart, loading: cartLoading } = useCart();
   const { showToast } = useToast();
 
   const [selectedWindow, setSelectedWindow] = useState(0);
@@ -36,13 +36,9 @@ export default function CheckoutPage() {
     city: "",
     zip: "",
   });
-  const [payment, setPayment] = useState({
-    cardNumber: "",
-    expiry: "",
-    cvc: "",
-  });
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -56,12 +52,12 @@ export default function CheckoutPage() {
   const items = cart?.items || [];
 
   useEffect(() => {
-    if (!isLoading && !cartLoading && user?.role === "customer" && items.length === 0) {
+    if (!isLoading && !cartLoading && user?.role === "customer" && items.length === 0 && !orderId) {
       router.replace("/cart");
     }
-  }, [isLoading, cartLoading, user, items.length, router]);
+  }, [isLoading, cartLoading, user, items.length, orderId, router]);
 
-  if (isLoading || !user || user.role !== "customer" || cartLoading || items.length === 0) return null;
+  if (isLoading || !user || user.role !== "customer" || cartLoading || (items.length === 0 && !orderId)) return null;
 
   const subtotal = items.reduce(
     (sum, i) => sum + Number(i.product?.priceUsd || 0) * i.quantity,
@@ -73,17 +69,20 @@ export default function CheckoutPage() {
     try {
       setPlacing(true);
       setError("");
-      const destinationAddress = `${address.street}, ${address.city} ${address.zip}`.trim();
-      await ordersApi.checkout({ destinationAddress });
-      await clearCart();
-      showToast("Order placed successfully!", "success");
-      router.push("/dashboard/customer/orders");
+      let id = orderId;
+      if (!id) {
+        const destinationAddress = `${address.street}, ${address.city} ${address.zip}`.trim();
+        const order = await ordersApi.checkout({ destinationAddress });
+        id = order.id;
+        setOrderId(id);
+      }
+      const session = await paymentsApi.createCheckoutSession(id);
+      window.location.href = session.url;
     } catch (err: unknown) {
       const message =
         err instanceof ApiError || err instanceof Error ? err.message : "Failed to place order.";
       setError(message);
       showToast(message, "error");
-    } finally {
       setPlacing(false);
     }
   };
@@ -105,7 +104,7 @@ export default function CheckoutPage() {
         <h1 className="text-[32px] sm:text-[42px] font-normal text-[#1a1a1a] mb-8">Checkout</h1>
 
         {error && (
-          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-600 text-sm">
+          <div className="animate-fade-in-up mb-6 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-600 text-sm">
             {error}
           </div>
         )}
@@ -116,7 +115,7 @@ export default function CheckoutPage() {
           <div className="flex flex-col gap-5">
 
             {/* Step 01 — Delivery address */}
-            <div className="bg-white rounded-2xl p-6 border border-[#e8e4da]">
+            <div className="animate-fade-in-up bg-white rounded-2xl p-6 border border-[#e8e4da]">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-9 h-9 rounded-full bg-[#e8f5e0] flex items-center justify-center text-[16px] shrink-0">
                   📍
@@ -161,7 +160,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Step 02 — Delivery window */}
-            <div className="bg-white rounded-2xl p-6 border border-[#e8e4da]">
+            <div className="animate-fade-in-up bg-white rounded-2xl p-6 border border-[#e8e4da]" style={{ animationDelay: "80ms" }}>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-9 h-9 rounded-full bg-[#e8f5e0] flex items-center justify-center text-[16px] shrink-0">
                   🚚
@@ -177,10 +176,10 @@ export default function CheckoutPage() {
                   <button
                     key={i}
                     onClick={() => setSelectedWindow(i)}
-                    className={`px-5 py-3.5 rounded-xl text-[14px] cursor-pointer transition-all ${
+                    className={`px-5 py-3.5 rounded-xl text-[14px] cursor-pointer transition-all active:scale-95 ${
                       selectedWindow === i
-                        ? "border-2 border-[#2d5a1b] bg-[#e8f5e0] text-[#2d5a1b] font-semibold"
-                        : "border border-[#d8d4c8] bg-white text-[#444]"
+                        ? "border-2 border-[#2d5a1b] bg-[#e8f5e0] text-[#2d5a1b] font-semibold scale-105"
+                        : "border border-[#d8d4c8] bg-white text-[#444] hover:border-[#2d5a1b]/50"
                     }`}
                   >
                     {w.label}
@@ -190,7 +189,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Step 03 — Payment */}
-            <div className="bg-white rounded-2xl p-6 border border-[#e8e4da]">
+            <div className="animate-fade-in-up bg-white rounded-2xl p-6 border border-[#e8e4da]" style={{ animationDelay: "160ms" }}>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-9 h-9 rounded-full bg-[#e8f5e0] flex items-center justify-center text-[16px] shrink-0">
                   💳
@@ -201,30 +200,16 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className={labelClass}>Card Number</label>
-                <input className={inputClass} value={payment.cardNumber}
-                  onChange={(e) => setPayment({ ...payment, cardNumber: e.target.value })} />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Expiry</label>
-                  <input className={inputClass} value={payment.expiry}
-                    onChange={(e) => setPayment({ ...payment, expiry: e.target.value })} />
-                </div>
-                <div>
-                  <label className={labelClass}>CVC</label>
-                  <input className={inputClass} value={payment.cvc}
-                    onChange={(e) => setPayment({ ...payment, cvc: e.target.value })} />
-                </div>
-              </div>
+              <p className="text-[14px] text-[#555] leading-relaxed">
+                Payment is handled securely by Stripe. After placing your order, you&apos;ll be
+                redirected to Stripe Checkout to enter your card details.
+              </p>
             </div>
 
           </div>
 
           {/* RIGHT — order summary */}
-          <div className="bg-white rounded-2xl p-6 border border-[#e8e4da] lg:sticky lg:top-20">
+          <div className="animate-fade-in-up bg-white rounded-2xl p-6 border border-[#e8e4da] lg:sticky lg:top-20" style={{ animationDelay: "240ms" }}>
             <h3 className="text-[20px] font-normal text-[#1a1a1a] mb-5">Order</h3>
 
             {items.map((item) => (
@@ -251,9 +236,9 @@ export default function CheckoutPage() {
             <button
               onClick={handlePlaceOrder}
               disabled={placing}
-              className="w-full py-4 bg-[#1e4d14] text-white rounded-full text-[15px] sm:text-[16px] font-semibold hover:bg-[#2d5a1b] transition-colors disabled:opacity-50"
+              className="w-full py-4 bg-[#1e4d14] text-white rounded-full text-[15px] sm:text-[16px] font-semibold hover:bg-[#2d5a1b] active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {placing ? "Placing order..." : "Place order"}
+              {placing ? "Redirecting to Stripe..." : "Continue to payment"}
             </button>
           </div>
         </div>

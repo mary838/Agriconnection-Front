@@ -10,6 +10,7 @@ import {
   Settings,
   ShoppingBag,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
@@ -19,6 +20,7 @@ const navItems = [
   { icon: Users, key: "Farmers", href: "/dashboard/admin/farmers" },
   { icon: Package, key: "Products", href: "/dashboard/admin/products" },
   { icon: ShoppingBag, key: "Orders", href: "/dashboard/admin/orders" },
+  { icon: Wallet, key: "Payouts", href: "/dashboard/admin/payouts" },
   { icon: BarChart2, key: "Reports", href: "/dashboard/admin/reports" },
   { icon: LifeBuoy, key: "Support", href: "/dashboard/admin/support" },
 ];
@@ -39,6 +41,7 @@ export default function AdminSidebar({
     Farmers: dict.dashboard.shared.navFarmers,
     Products: dict.dashboard.shared.navProducts,
     Orders: dict.dashboard.shared.navOrders,
+    Payouts: "Payouts",
     Reports: dict.dashboard.shared.navReports,
     Support: dict.dashboard.shared.navSupport,
   };
@@ -47,7 +50,7 @@ export default function AdminSidebar({
     <>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="animate-fade-in-up fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={onClose}
         />
       )}
@@ -84,7 +87,7 @@ export default function AdminSidebar({
               key={key}
               href={href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-200 hover:translate-x-1 ${
                 active === key
                   ? "bg-white text-[#1e3d18]"
                   : "text-white/60 hover:text-white hover:bg-white/10"
@@ -98,7 +101,7 @@ export default function AdminSidebar({
           <Link
             href="/profile"
             onClick={onClose}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-colors ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-200 hover:translate-x-1 ${
               active === "Your Profile"
                 ? "bg-white text-[#1e3d18]"
                 : "text-white/60 hover:text-white hover:bg-white/10"

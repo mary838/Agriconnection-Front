@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import SplashScreen from "@/components/SplashScreen";
+import PageTransition from "@/components/PageTransition";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <NotificationProvider>
                 <CartProvider>
                   <SplashScreen />
-                  {children}
+                  <PageTransition>{children}</PageTransition>
                 </CartProvider>
                     </NotificationProvider>
             </AuthProvider>

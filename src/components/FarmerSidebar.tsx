@@ -52,7 +52,7 @@ export default function FarmerSidebar({
     <>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="animate-fade-in-up fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={onClose}
         />
       )}
@@ -89,7 +89,7 @@ export default function FarmerSidebar({
               key={id}
               href={href}
               onClick={onClose}
-              className={`flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold ${
+              className={`flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-all duration-200 hover:translate-x-1 ${
                 active === id
                   ? "bg-white text-[#174832]"
                   : "text-[#b8c9b3] hover:bg-white/10 hover:text-white"
@@ -103,7 +103,7 @@ export default function FarmerSidebar({
           <Link
             href="/profile"
             onClick={onClose}
-            className={`flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold ${
+            className={`flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-all duration-200 hover:translate-x-1 ${
               active === "Your Profile"
                 ? "bg-white text-[#174832]"
                 : "text-[#b8c9b3] hover:bg-white/10 hover:text-white"
@@ -116,9 +116,17 @@ export default function FarmerSidebar({
       </div>
 
       <div className="rounded-2xl bg-white/10 p-4">
-        <Link href="/profile" onClick={onClose} className="flex items-center gap-3 hover:opacity-80">
-          <div className="w-11 h-11 rounded-full bg-[#dce8d4] flex items-center justify-center text-[#174832] font-bold">
-            {user?.name?.charAt(0).toUpperCase() || "F"}
+        <Link href="/profile" onClick={onClose} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <div className="w-11 h-11 rounded-full bg-[#dce8d4] flex items-center justify-center text-[#174832] font-bold overflow-hidden shrink-0">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name || "Farmer"}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              user?.name?.charAt(0).toUpperCase() || "F"
+            )}
           </div>
 
           <div>
@@ -139,7 +147,7 @@ export default function FarmerSidebar({
             localStorage.removeItem("farmer");
             window.location.href = "/login";
           }}
-          className="mt-4 flex items-center gap-2 text-[#b8c9b3] text-sm hover:text-white"
+          className="mt-4 flex items-center gap-2 text-[#b8c9b3] text-sm hover:text-white transition-colors"
         >
           <LogOut size={14} />
           {dict.dashboard.shared.signOut}

@@ -88,10 +88,10 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`text-[13.5px] px-4 py-1.5 transition-colors whitespace-nowrap ${
+                  className={`relative text-[13.5px] px-4 py-1.5 transition-colors whitespace-nowrap after:absolute after:left-4 after:right-4 after:-bottom-px after:h-[2px] after:bg-[#2d5a1b] after:origin-left after:transition-transform after:duration-300 ${
                     pathname === link.href
-                      ? "text-[#2d5a1b] font-medium"
-                      : "text-[#4a5568] hover:text-[#2d5a1b]"
+                      ? "text-[#2d5a1b] font-medium after:scale-x-100"
+                      : "text-[#4a5568] hover:text-[#2d5a1b] after:scale-x-0 hover:after:scale-x-100"
                   }`}
                 >
                   {link.label}
@@ -107,12 +107,12 @@ export default function Navbar() {
               <Link
                 href="/cart"
                 onClick={handleCartClick}
-                className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                className="relative text-[#4a5568] hover:text-[#2d5a1b] hover:scale-110 transition-all"
                 aria-label={`Cart, ${cartCount} items`}
               >
                 <ShoppingCart size={22} strokeWidth={1.8} />
                 {cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                  <span key={cartCount} className="animate-pop-in absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
                     {cartCount}
                   </span>
                 )}
@@ -126,14 +126,14 @@ export default function Navbar() {
                 aria-label={dict.nav.language}
                 title={dict.nav.language}
               >
-                <Globe size={20} strokeWidth={1.8} />
+                <Globe size={20} strokeWidth={1.8} className="transition-transform duration-300" style={{ transform: langOpen ? "rotate(90deg)" : "none" }} />
                 <span className="hidden sm:inline text-[12.5px] font-medium uppercase">
                   {language}
                 </span>
               </button>
 
               {langOpen && (
-                <div className="absolute right-0 top-full mt-2 w-40 bg-white/95 backdrop-blur-md border border-[#dce4d3] shadow-sm rounded-lg z-50 overflow-hidden">
+                <div className="animate-scale-in origin-top-right absolute right-0 top-full mt-2 w-40 bg-white/95 backdrop-blur-md border border-[#dce4d3] shadow-sm rounded-lg z-50 overflow-hidden">
                   {LANGUAGES.map((l) => (
                     <button
                       key={l.code}
@@ -157,12 +157,12 @@ export default function Navbar() {
             {user && (
               <Link
                 href="/notifications"
-                className="relative text-[#4a5568] hover:text-[#2d5a1b] transition-colors"
+                className="relative text-[#4a5568] hover:text-[#2d5a1b] hover:scale-110 transition-all"
                 aria-label={`${dict.nav.notifications}, ${unreadCount} unread`}
               >
                 <Bell size={22} strokeWidth={1.8} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                  <span key={unreadCount} className="animate-pop-in absolute -top-1.5 -right-1.5 bg-[#2d5a1b] text-white text-[10px] font-bold w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
                     {unreadCount}
                   </span>
                 )}
@@ -173,10 +173,18 @@ export default function Navbar() {
               <>
                 <Link
                   href="/profile"
-                  className="w-[34px] h-[34px] rounded-full bg-[#b8cfa8] ring-2 ring-[#c8d8b8] shrink-0 flex items-center justify-center text-[#2d5a1b] text-[13px] font-semibold"
+                  className="w-[34px] h-[34px] rounded-full bg-[#b8cfa8] ring-2 ring-[#c8d8b8] shrink-0 flex items-center justify-center text-[#2d5a1b] text-[13px] font-semibold overflow-hidden hover:scale-110 hover:ring-[#2d5a1b] transition-all"
                   title={dict.nav.profile}
                 >
-                  {initials}
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name || user.email}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    initials
+                  )}
                 </Link>
 
                 <button
@@ -204,15 +212,17 @@ export default function Navbar() {
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={dict.nav.toggleMenu}
             >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              <span className="animate-scale-in inline-flex" key={mobileOpen ? "close" : "open"}>
+                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              </span>
             </button>
           </div>
         </div>
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-[#dce4d3] bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 flex flex-col">
-          {navLinks.map((link) => {
+        <div className="animate-slide-down md:hidden border-t border-[#dce4d3] bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 flex flex-col">
+          {navLinks.map((link, i) => {
             if (link.role && user?.role !== link.role) return null;
 
             return (
@@ -220,7 +230,8 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`text-sm py-2.5 border-b border-[#e8eed8] last:border-0 transition-colors ${
+                style={{ animationDelay: `${i * 40}ms` }}
+                className={`animate-fade-in-up text-sm py-2.5 border-b border-[#e8eed8] last:border-0 transition-colors ${
                   pathname === link.href
                     ? "text-[#2d5a1b] font-medium"
                     : "text-[#4a5568] hover:text-[#2d5a1b]"

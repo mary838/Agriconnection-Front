@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { products as productsApi, resolveImageUrl, type Product } from "@/lib/api";
+import { products as productsApi, resolveImageUrl, isOutOfStock, type Product } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 
 const FALLBACK_IMAGE =
@@ -17,7 +17,8 @@ export default function HarvestSection() {
     const fetchProducts = async () => {
       try {
         const data = await productsApi.list(language);
-        setProducts(data.slice(0, 4));
+        const inStock = data.filter((product) => !isOutOfStock(product));
+        setProducts(inStock.slice(0, 4));
       } catch {
         setProducts([]);
       } finally {
@@ -59,19 +60,19 @@ export default function HarvestSection() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl overflow-hidden bg-[#faf8f4] border border-[#ede8df] animate-pulse"
+                className="rounded-2xl overflow-hidden bg-[#faf8f4] border border-[#ede8df]"
               >
-                <div className="aspect-[4/3] bg-[#e8e0d0]" />
+                <div className="aspect-[4/3] animate-shimmer" />
                 <div className="px-4 py-3 space-y-2">
-                  <div className="h-4 bg-[#e8e0d0] rounded w-3/4" />
-                  <div className="h-3 bg-[#e8e0d0] rounded w-1/2" />
+                  <div className="h-4 rounded w-3/4 animate-shimmer" />
+                  <div className="h-3 rounded w-1/2 animate-shimmer" />
                 </div>
               </div>
             ))}
           </div>
         ) : products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {products.map((product) => {
+            {products.map((product, i) => {
               const farmName =
                 product.farmer?.user?.name ||
                 product.farmer?.farmerCode ||
@@ -81,7 +82,8 @@ export default function HarvestSection() {
                 <Link
                   key={product.id}
                   href={`/marketplace/${product.id}`}
-                  className="group rounded-2xl overflow-hidden bg-[#faf8f4] border border-[#ede8df] hover:shadow-md transition-shadow"
+                  style={{ animationDelay: `${i * 80}ms` }}
+                  className="animate-fade-in-up group rounded-2xl overflow-hidden bg-[#faf8f4] border border-[#ede8df] hover:shadow-md hover:-translate-y-1 transition-all"
                 >
                   {/* Image */}
                   <div className="aspect-[4/3] overflow-hidden bg-[#e8e0d0]">
