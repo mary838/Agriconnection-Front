@@ -52,13 +52,6 @@ function orderTotal(order: Order): number | null {
   return total === null ? null : Number(total);
 }
 
-function formatStepDate(dateStr: string) {
-  const date = new Date(dateStr);
-  const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${day}, ${time}`;
-}
-
 function statusBadgeClass(status: string) {
   const s = status.toLowerCase();
   if (s === "delivered") return "bg-[#dff7ea] text-[#008454]";
@@ -311,11 +304,6 @@ export default function CustomerDashboardPage() {
                         <p className={i <= activeStepIndex ? "text-white" : "text-white/40"}>
                           {step}
                         </p>
-                        {i === activeStepIndex && (
-                          <p className="text-[11px] text-[#b8c9b3] mt-0.5">
-                            {formatStepDate(orderPlacedAt(activeOrder))}
-                          </p>
-                        )}
                       </div>
                       {i < STEP_LABELS.length - 1 && <div className="flex-1" />}
                     </Fragment>

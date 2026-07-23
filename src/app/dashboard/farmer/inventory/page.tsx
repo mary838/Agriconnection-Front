@@ -11,6 +11,7 @@ import {
   getToken,
   ApiError,
   resolveImageUrl,
+  provinceName,
   type User,
   type Farmer,
   type Product,
@@ -249,7 +250,7 @@ function InventoryRow({
             {product.name}
           </h3>
           <p className="text-[#8a8174] text-xs mt-1">
-            {inventoryRecord?.province?.name || farmer?.province?.name || dict.dashboard.farmerInventory.provinceNotSet}
+            {inventoryRecord?.province?.name || provinceName(farmer?.province) || dict.dashboard.farmerInventory.provinceNotSet}
           </p>
           {rowError && <p className="text-red-500 text-xs mt-1">{rowError}</p>}
         </div>

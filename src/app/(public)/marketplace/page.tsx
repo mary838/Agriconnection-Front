@@ -224,7 +224,7 @@ export default function MarketplacePage() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="relative flex flex-wrap items-center gap-3 mb-6" ref={filtersRef}>
           <div className="flex-1 min-w-[200px] relative">
             <Search
               size={15}
@@ -240,7 +240,7 @@ export default function MarketplacePage() {
             />
           </div>
 
-          <div className="relative" ref={filtersRef}>
+          <div>
             <button
               onClick={() => setFiltersOpen((open) => !open)}
               className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e0dbd0] rounded-xl text-[14px] text-[#4a5568] hover:border-[#2d5a1b] transition-colors whitespace-nowrap"
@@ -255,7 +255,7 @@ export default function MarketplacePage() {
             </button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-20 w-64 bg-white border border-[#e0dbd0] rounded-xl shadow-lg p-4">
+              <div className="absolute right-0 top-[calc(100%+8px)] z-20 w-64 max-w-[calc(100vw-3rem)] bg-white border border-[#e0dbd0] rounded-xl shadow-lg p-4">
                 <p className="text-[13px] font-semibold text-[#1c2b1a] mb-3">
                   {dict.marketplace.priceRange}
                 </p>

@@ -103,20 +103,31 @@ export type Province = {
 export type Farmer = {
   id: string;
   farmerCode: string;
-  userId: string;
-  provinceId: number;
+  userId?: string;
+  provinceId?: number;
+  fullName?: string;
+  email?: string;
   phone: string;
-  telegramPhone?: string;
+  telegramPhone?: string | null;
   farmName?: string | null;
   bio?: string | null;
   address?: string | null;
   status: string;
   verifiedAt?: string | null;
   createdAt: string;
-  updatedAt: string;
-  province?: Province;
+  updatedAt?: string;
+  province?: string | Province | null;
   user?: User;
 };
+
+export function farmerName(farmer: Pick<Farmer, "fullName" | "user" | "farmerCode">): string {
+  return farmer.fullName || farmer.user?.name || farmer.farmerCode;
+}
+
+export function provinceName(province?: string | Province | null): string {
+  if (!province) return "";
+  return typeof province === "string" ? province : province.name;
+}
 
 export type Customer = {
   id: string;
@@ -242,12 +253,25 @@ export type Cart = {
   items: CartItem[];
 };
 
+export type OrderItem = {
+  id: string;
+  orderId: string;
+  productId: string;
+  farmerId: string;
+  quantity: number | string;
+  unitPriceUsd: number | string;
+  subtotalUsd: number | string;
+  farmer?: Farmer;
+  product?: Product;
+};
+
 export type Order = {
   id: string;
   status: string;
   destinationAddress?: string;
   createdAt: string;
   updatedAt: string;
+  items?: OrderItem[];
   [key: string]: unknown;
 };
 
@@ -423,6 +447,10 @@ export const farmers = {
   create: (body: FarmerInput) => request<Farmer>("/farmers", { method: "POST", body }),
   update: (id: string, body: Partial<FarmerInput>) =>
     request<Farmer>(`/farmers/${id}`, { method: "PATCH", body }),
+  updateStatus: (id: string, body: { status: string }) =>
+    request<Farmer>(`/farmers/${id}/status`, { method: "PATCH", body }),
+  approve: (id: string) => request<Farmer>(`/farmers/${id}/approve`, { method: "POST" }),
+  reject: (id: string) => request<Farmer>(`/farmers/${id}/reject`, { method: "POST" }),
   remove: (id: string) => request<void>(`/farmers/${id}`, { method: "DELETE" }),
 };
 

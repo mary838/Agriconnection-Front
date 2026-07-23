@@ -14,6 +14,7 @@ import {
   ApiError,
   resolveImageUrl,
   groupFarmerOrderItems,
+  provinceName,
   type User,
   type Farmer,
   type Product,
@@ -192,6 +193,7 @@ export default function FarmerDashboardPage() {
             title={dict.dashboard.farmerHome.totalRevenue}
             value={revenue !== null ? `$${revenue.toFixed(2)}` : dict.dashboard.shared.na}
             note={dict.dashboard.farmerHome.fromPayouts}
+            href="/dashboard/farmer/reports"
           />
           <StatCard
             title={dict.dashboard.farmerHome.recentOrders}
@@ -225,7 +227,7 @@ export default function FarmerDashboardPage() {
             <InfoCard title={dict.dashboard.farmerHome.phoneLabel} value={farmer.phone || dict.dashboard.shared.na} />
             <InfoCard
               title={dict.dashboard.farmerHome.provinceLabel}
-              value={farmer.province?.name || `${dict.dashboard.farmerHome.provinceIdPrefix} ${farmer.provinceId}`}
+              value={provinceName(farmer.province) || `${dict.dashboard.farmerHome.provinceIdPrefix} ${farmer.provinceId}`}
             />
             <InfoCard title={dict.dashboard.farmerHome.statusLabel} value={farmer.status} />
           </div>
@@ -303,10 +305,12 @@ function StatCard({
   title,
   value,
   note,
+  href,
 }: {
   title: string;
   value: string;
   note: string;
+  href?: string;
 }) {
   return (
     <div className="rounded-[26px] bg-white p-8 border border-[#e6dfd2] shadow-sm">
@@ -317,7 +321,16 @@ function StatCard({
       >
         {value}
       </p>
-      <p className="text-[#009b5a] text-sm font-semibold mt-2">{note}</p>
+      {href ? (
+        <Link
+          href={href}
+          className="text-[#009b5a] text-sm font-semibold mt-2 inline-block hover:underline"
+        >
+          {note}
+        </Link>
+      ) : (
+        <p className="text-[#009b5a] text-sm font-semibold mt-2">{note}</p>
+      )}
     </div>
   );
 }

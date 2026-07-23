@@ -12,7 +12,7 @@ import {
   Warehouse,
   X,
 } from "lucide-react";
-import { auth, clearToken, type User, type Farmer } from "@/lib/api";
+import { auth, clearToken, provinceName, type User, type Farmer } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 
 const navItemDefs = [
@@ -134,7 +134,7 @@ export default function FarmerSidebar({
               {user?.name || dict.dashboard.farmerHome.defaultFarmerName}
             </p>
             <p className="text-[#b8c9b3] text-xs">
-              {farmer?.province?.name || farmer?.farmerCode || dict.dashboard.shared.viewProfileFallback}
+              {provinceName(farmer?.province) || farmer?.farmerCode || dict.dashboard.shared.viewProfileFallback}
             </p>
           </div>
         </Link>

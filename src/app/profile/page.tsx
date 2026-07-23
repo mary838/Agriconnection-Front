@@ -10,6 +10,7 @@ import {
   provinces as provincesApi,
   getToken,
   ApiError,
+  provinceName,
   type User,
   type Farmer,
   type Province,
@@ -405,8 +406,8 @@ export default function ProfilePage() {
                     onClick={startEditProvince}
                     className="w-full flex items-center bg-gray-50 hover:bg-gray-100 rounded-2xl px-4 py-3 border border-gray-100 gap-2 text-left transition-colors"
                   >
-                    <span className={`flex-1 text-[14px] ${farmer.province?.name ? "text-gray-700" : "text-red-400"}`}>
-                      {farmer.province?.name || "Not set — required to create products"}
+                    <span className={`flex-1 text-[14px] ${provinceName(farmer.province) ? "text-gray-700" : "text-red-400"}`}>
+                      {provinceName(farmer.province) || "Not set — required to create products"}
                     </span>
                     <span className="shrink-0 text-gray-300">
                       <MapPin size={15} />

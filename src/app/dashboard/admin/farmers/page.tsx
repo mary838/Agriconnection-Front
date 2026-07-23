@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, Menu, CheckCircle, Clock, XCircle } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
-import { farmers as farmersApi, ApiError, type Farmer } from "@/lib/api";
+import { farmers as farmersApi, ApiError, farmerName, provinceName, type Farmer } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
@@ -27,6 +27,7 @@ export default function AdminFarmersPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const filterLabels: Record<string, string> = {
     All: dict.dashboard.adminFarmers.filterAll,
@@ -43,9 +44,34 @@ export default function AdminFarmersPage() {
       .finally(() => setLoading(false));
   }, [dict]);
 
+  const handleApprove = async (id: string) => {
+    try {
+      setUpdatingId(id);
+      const updated = await farmersApi.approve(id);
+      setFarmers((prev) => prev.map((f) => (f.id === id ? { ...f, ...updated } : f)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : dict.dashboard.adminFarmers.failedToUpdateStatus);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    if (!window.confirm(dict.dashboard.adminFarmerDetail.confirmReject)) return;
+    try {
+      setUpdatingId(id);
+      const updated = await farmersApi.reject(id);
+      setFarmers((prev) => prev.map((f) => (f.id === id ? { ...f, ...updated } : f)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : dict.dashboard.adminFarmers.failedToUpdateStatus);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const filteredFarmers = farmers.filter((f) => {
     const farmName = f.farmName || f.farmerCode;
-    const ownerName = f.user?.name || "";
+    const ownerName = farmerName(f);
     const q = search.toLowerCase();
     const matchesSearch = farmName.toLowerCase().includes(q) || ownerName.toLowerCase().includes(q);
 
@@ -150,9 +176,9 @@ export default function AdminFarmersPage() {
                         <tr key={f.id} className="border-b border-[#f8f6f2] last:border-0 hover:bg-[#faf9f6] transition-colors">
                           <td className="py-4 pr-4">
                             <p className="text-[14px] font-semibold text-[#1c2b1a]">{f.farmName || f.farmerCode}</p>
-                            <p className="text-[12px] text-[#9aaa8a]">{f.user?.name || "—"}</p>
+                            <p className="text-[12px] text-[#9aaa8a]">{farmerName(f) || "—"}</p>
                           </td>
-                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">{f.province?.name || "—"}</td>
+                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">{provinceName(f.province) || "—"}</td>
                           <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">{f.phone || "—"}</td>
                           <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">
                             {f.createdAt ? new Date(f.createdAt).toLocaleDateString() : "—"}
@@ -164,12 +190,32 @@ export default function AdminFarmersPage() {
                             </span>
                           </td>
                           <td className="py-4 pr-4 text-[13px] font-medium whitespace-nowrap">
-                            <Link
-                              href={`/dashboard/admin/farmers/${f.id}`}
-                              className="text-[#2d5a1b] hover:underline"
-                            >
-                              {dict.dashboard.adminFarmers.viewLink}
-                            </Link>
+                            <div className="flex items-center gap-3">
+                              <Link
+                                href={`/dashboard/admin/farmers/${f.id}`}
+                                className="text-[#2d5a1b] hover:underline"
+                              >
+                                {dict.dashboard.adminFarmers.viewLink}
+                              </Link>
+                              {f.status?.toUpperCase() === "PENDING" && (
+                                <>
+                                  <button
+                                    onClick={() => handleApprove(f.id)}
+                                    disabled={updatingId === f.id}
+                                    className="text-[#2d5a1b] hover:underline disabled:opacity-50"
+                                  >
+                                    {dict.dashboard.adminFarmers.approveAction}
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(f.id)}
+                                    disabled={updatingId === f.id}
+                                    className="text-[#b91c1c] hover:underline disabled:opacity-50"
+                                  >
+                                    {dict.dashboard.adminFarmers.rejectAction}
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

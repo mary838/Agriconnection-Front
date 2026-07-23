@@ -449,6 +449,7 @@ export type Dictionary = {
       titleSuffix: string;
       liveCount: string;
       failedToLoad: string;
+      noSalesData: string;
       monthlySales: string;
       revenueAcrossFarms: string;
       last6Months: string;
@@ -486,6 +487,9 @@ export type Dictionary = {
       loadingFarmers: string;
       noFarmersFound: string;
       viewLink: string;
+      approveAction: string;
+      rejectAction: string;
+      failedToUpdateStatus: string;
     };
     adminFarmerDetail: {
       backToFarmers: string;
@@ -503,6 +507,12 @@ export type Dictionary = {
       productWord: string;
       productWordPlural: string;
       noProductsListed: string;
+      approveButton: string;
+      rejectButton: string;
+      approving: string;
+      rejecting: string;
+      confirmReject: string;
+      failedToUpdateStatus: string;
     };
     adminOrders: {
       title: string;
@@ -1191,6 +1201,7 @@ export const translations: Record<Language, Dictionary> = {
         titleSuffix: "— this month",
         liveCount: "Live count",
         failedToLoad: "Failed to load",
+        noSalesData: "No sales data yet",
         monthlySales: "Monthly sales",
         revenueAcrossFarms: "Revenue across all farms",
         last6Months: "Last 6 months",
@@ -1228,6 +1239,9 @@ export const translations: Record<Language, Dictionary> = {
         loadingFarmers: "Loading farmers…",
         noFarmersFound: "No farmers found.",
         viewLink: "View →",
+        approveAction: "Approve",
+        rejectAction: "Reject",
+        failedToUpdateStatus: "Failed to update farmer status.",
       },
       adminFarmerDetail: {
         backToFarmers: "Back to farmers",
@@ -1245,6 +1259,12 @@ export const translations: Record<Language, Dictionary> = {
         productWord: "product",
         productWordPlural: "products",
         noProductsListed: "No products listed yet.",
+        approveButton: "Approve farmer",
+        rejectButton: "Reject farmer",
+        approving: "Approving…",
+        rejecting: "Rejecting…",
+        confirmReject: "Are you sure you want to reject this farmer?",
+        failedToUpdateStatus: "Failed to update farmer status.",
       },
       adminOrders: {
         title: "Orders",
@@ -1931,6 +1951,7 @@ export const translations: Record<Language, Dictionary> = {
         titleSuffix: "— ខែនេះ",
         liveCount: "ចំនួនផ្ទាល់",
         failedToLoad: "បរាជ័យក្នុងការផ្ទុក",
+        noSalesData: "មិនទាន់មានទិន្នន័យលក់ទេ",
         monthlySales: "ការលក់ប្រចាំខែ",
         revenueAcrossFarms: "ចំណូលពីគ្រប់កសិដ្ឋាន",
         last6Months: "៦ខែចុងក្រោយ",
@@ -1968,6 +1989,9 @@ export const translations: Record<Language, Dictionary> = {
         loadingFarmers: "កំពុងផ្ទុកកសិករ…",
         noFarmersFound: "រកមិនឃើញកសិករទេ។",
         viewLink: "មើល →",
+        approveAction: "អនុម័ត",
+        rejectAction: "បដិសេធ",
+        failedToUpdateStatus: "បរាជ័យក្នុងការធ្វើបច្ចុប្បន្នភាពស្ថានភាពកសិករ។",
       },
       adminFarmerDetail: {
         backToFarmers: "ត្រឡប់ទៅកសិករ",
@@ -1985,6 +2009,12 @@ export const translations: Record<Language, Dictionary> = {
         productWord: "ផលិតផល",
         productWordPlural: "ផលិតផល",
         noProductsListed: "មិនទាន់មានផលិតផលចុះបញ្ជីទេ។",
+        approveButton: "អនុម័តកសិករ",
+        rejectButton: "បដិសេធកសិករ",
+        approving: "កំពុងអនុម័ត…",
+        rejecting: "កំពុងបដិសេធ…",
+        confirmReject: "តើអ្នកប្រាកដជាចង់បដិសេធកសិករនេះមែនទេ?",
+        failedToUpdateStatus: "បរាជ័យក្នុងការធ្វើបច្ចុប្បន្នភាពស្ថានភាពកសិករ។",
       },
       adminOrders: {
         title: "ការបញ្ជាទិញ",
@@ -2654,6 +2684,7 @@ export const translations: Record<Language, Dictionary> = {
         titleSuffix: "— 本月",
         liveCount: "实时统计",
         failedToLoad: "加载失败",
+        noSalesData: "暂无销售数据",
         monthlySales: "月度销售额",
         revenueAcrossFarms: "所有农场的收入",
         last6Months: "最近6个月",
@@ -2691,6 +2722,9 @@ export const translations: Record<Language, Dictionary> = {
         loadingFarmers: "正在加载农民…",
         noFarmersFound: "未找到农民。",
         viewLink: "查看 →",
+        approveAction: "批准",
+        rejectAction: "拒绝",
+        failedToUpdateStatus: "更新农民状态失败。",
       },
       adminFarmerDetail: {
         backToFarmers: "返回农民列表",
@@ -2708,6 +2742,12 @@ export const translations: Record<Language, Dictionary> = {
         productWord: "个产品",
         productWordPlural: "个产品",
         noProductsListed: "暂无上架产品。",
+        approveButton: "批准农民",
+        rejectButton: "拒绝农民",
+        approving: "正在批准…",
+        rejecting: "正在拒绝…",
+        confirmReject: "您确定要拒绝该农民吗?",
+        failedToUpdateStatus: "更新农民状态失败。",
       },
       adminOrders: {
         title: "订单",
@@ -3394,6 +3434,7 @@ export const translations: Record<Language, Dictionary> = {
         titleSuffix: "— ce mois-ci",
         liveCount: "Décompte en direct",
         failedToLoad: "Échec du chargement",
+        noSalesData: "Aucune donnée de vente pour le moment",
         monthlySales: "Ventes mensuelles",
         revenueAcrossFarms: "Revenus de toutes les fermes",
         last6Months: "6 derniers mois",
@@ -3431,6 +3472,9 @@ export const translations: Record<Language, Dictionary> = {
         loadingFarmers: "Chargement des agriculteurs…",
         noFarmersFound: "Aucun agriculteur trouvé.",
         viewLink: "Voir →",
+        approveAction: "Approuver",
+        rejectAction: "Rejeter",
+        failedToUpdateStatus: "Échec de la mise à jour du statut de l'agriculteur.",
       },
       adminFarmerDetail: {
         backToFarmers: "Retour aux agriculteurs",
@@ -3448,6 +3492,12 @@ export const translations: Record<Language, Dictionary> = {
         productWord: "produit",
         productWordPlural: "produits",
         noProductsListed: "Aucun produit publié pour le moment.",
+        approveButton: "Approuver l'agriculteur",
+        rejectButton: "Rejeter l'agriculteur",
+        approving: "Approbation…",
+        rejecting: "Rejet…",
+        confirmReject: "Voulez-vous vraiment rejeter cet agriculteur ?",
+        failedToUpdateStatus: "Échec de la mise à jour du statut de l'agriculteur.",
       },
       adminOrders: {
         title: "Commandes",

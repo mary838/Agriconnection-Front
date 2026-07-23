@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  Search, Plus, CheckCircle, Clock, XCircle, Menu,
-} from "lucide-react";
+import { Menu } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
-import { farmers as farmersApi, ApiError, type Farmer } from "@/lib/api";
+import { farmers as farmersApi, orders as ordersApi, farmerName, ApiError, type Farmer, type Order } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 
 const stats = [
@@ -16,39 +13,83 @@ const stats = [
   { key: "revenue",   value: "$84.2k", sub: "+22% vs last month", featured: true  },
 ];
 
-const salesData = [
-  { month: "APR", value: 404 },
-  { month: "MAY", value: 539 },
-  { month: "JUN", value: 488 },
-  { month: "JUL", value: 690 },
-  { month: "AUG", value: 775 },
-  { month: "SEP", value: 842 },
-];
-const maxSales = Math.max(...salesData.map((d) => d.value)); 
-const topPerformers = [
-  { name: "Heirloom Tomatoes", farm: "Green Valley",    revenue: "$2,840", pct: 100 },
-  { name: "Wildflower Honey",  farm: "Blackwood Apiary",revenue: "$2,120", pct: 75  },
-  { name: "Pasture Eggs",      farm: "Meadowside",      revenue: "$1,780", pct: 63  },
-  { name: "Rainbow Carrots",   farm: "Meadowlark",      revenue: "$1,460", pct: 51  },
-];
+const MONTH_LABELS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
-  VERIFIED:  { color: "bg-[#eaf2e4] text-[#2d5a1b]",   icon: <CheckCircle size={11} className="text-[#2d5a1b]" /> },
-  ACTIVE:    { color: "bg-[#eaf2e4] text-[#2d5a1b]",   icon: <CheckCircle size={11} className="text-[#2d5a1b]" /> },
-  PENDING:   { color: "bg-[#fef3e2] text-[#b45309]",   icon: <Clock size={11} className="text-[#b45309]" /> },
-  SUSPENDED: { color: "bg-[#fee2e2] text-[#b91c1c]",   icon: <XCircle size={11} className="text-[#b91c1c]" /> },
-  REJECTED:  { color: "bg-[#fee2e2] text-[#b91c1c]",   icon: <XCircle size={11} className="text-[#b91c1c]" /> },
-};
+type SalesRange = "last3" | "last6" | "year";
 
-const defaultStatusStyle = { color: "bg-[#f0ece4] text-[#5a6a52]", icon: <Clock size={11} className="text-[#5a6a52]" /> };
+function orderTotal(order: Order): number {
+  const raw = order as Record<string, unknown>;
+  const total =
+    (raw.totalAmountUsd as number | string | undefined) ??
+    (raw.totalUsd as number | string | undefined) ??
+    (raw.amountUsd as number | string | undefined) ??
+    0;
+  return Number(total) || 0;
+}
+
+function buildMonthlySales(orders: Order[], range: SalesRange) {
+  const now = new Date();
+  const monthsBack = range === "last3" ? 3 : range === "year" ? now.getMonth() + 1 : 6;
+
+  const buckets = Array.from({ length: monthsBack }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1 - i), 1);
+    return { key: `${d.getFullYear()}-${d.getMonth()}`, month: MONTH_LABELS[d.getMonth()], value: 0 };
+  });
+  const bucketByKey = new Map(buckets.map((b) => [b.key, b]));
+
+  orders.forEach((o) => {
+    const dateStr = o.createdAt || (o as Record<string, unknown>).placedAt as string | undefined;
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    const bucket = bucketByKey.get(`${d.getFullYear()}-${d.getMonth()}`);
+    if (bucket) bucket.value += orderTotal(o);
+  });
+
+  return buckets;
+}
+
+function buildTopPerformers(orders: Order[]) {
+  const totals = new Map<string, { id: string; name: string; farm: string; total: number }>();
+
+  orders.forEach((order) => {
+    order.items?.forEach((item) => {
+      const productId = item.productId;
+      const name = item.product?.name ?? "";
+      const farm = item.farmer ? item.farmer.farmName || farmerName(item.farmer) : item.product?.farmer ? farmerName(item.product.farmer) : "";
+      const subtotal = Number(item.subtotalUsd) || 0;
+
+      const existing = totals.get(productId);
+      if (existing) {
+        existing.total += subtotal;
+      } else {
+        totals.set(productId, { id: productId, name, farm, total: subtotal });
+      }
+    });
+  });
+
+  const top = Array.from(totals.values())
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+
+  const maxTotal = Math.max(1, ...top.map((p) => p.total));
+
+  return top.map((p) => ({
+    id: p.id,
+    name: p.name,
+    farm: p.farm,
+    revenue: `$${p.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+    pct: Math.round((p.total / maxTotal) * 100),
+  }));
+}
 
 export default function AdminDashboard() {
   const { dict } = useLanguage();
-  const [farmerSearch, setFarmerSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [salesRange, setSalesRange] = useState<SalesRange>("last6");
 
   const statLabels: Record<string, string> = {
     products: dict.dashboard.shared.statTotalProducts,
@@ -65,12 +106,16 @@ export default function AdminDashboard() {
       .finally(() => setLoading(false));
   }, [dict]);
 
-  const filteredFarmers = farmers.filter((f) => {
-    const farmName = f.farmName || f.farmerCode;
-    const ownerName = f.user?.name || "";
-    const q = farmerSearch.toLowerCase();
-    return farmName.toLowerCase().includes(q) || ownerName.toLowerCase().includes(q);
-  });
+  useEffect(() => {
+    ordersApi
+      .list()
+      .then(setOrders)
+      .catch(() => setOrders([]));
+  }, []);
+
+  const salesData = buildMonthlySales(orders, salesRange);
+  const maxSales = Math.max(1, ...salesData.map((d) => d.value));
+  const topPerformers = buildTopPerformers(orders);
 
   return (
     <div className="flex min-h-screen bg-[#f5f2eb]">
@@ -159,10 +204,14 @@ export default function AdminDashboard() {
                   </h2>
                   <p className="text-[13px] text-[#9aaa8a]">{dict.dashboard.adminHome.revenueAcrossFarms}</p>
                 </div>
-                <select className="text-[12px] border border-[#e0dbd0] rounded-full px-4 py-1.5 text-[#4a5568] bg-[#faf9f6] focus:outline-none cursor-pointer self-start">
-                  <option>{dict.dashboard.adminHome.last6Months}</option>
-                  <option>{dict.dashboard.adminHome.last3Months}</option>
-                  <option>{dict.dashboard.adminHome.thisYear}</option>
+                <select
+                  value={salesRange}
+                  onChange={(e) => setSalesRange(e.target.value as SalesRange)}
+                  className="text-[12px] border border-[#e0dbd0] rounded-full px-4 py-1.5 text-[#4a5568] bg-[#faf9f6] focus:outline-none cursor-pointer self-start"
+                >
+                  <option value="last6">{dict.dashboard.adminHome.last6Months}</option>
+                  <option value="last3">{dict.dashboard.adminHome.last3Months}</option>
+                  <option value="year">{dict.dashboard.adminHome.thisYear}</option>
                 </select>
               </div>
 
@@ -171,11 +220,13 @@ export default function AdminDashboard() {
                   const isCurrent = i === salesData.length - 1;
                   const barH = Math.round((d.value / maxSales) * 160);
                   return (
-                    <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
-                      <span className="text-[10px] sm:text-[11px] font-medium text-[#7a8a6a]">${d.value}</span>
+                    <div key={d.key} className="flex-1 flex flex-col items-center gap-2">
+                      <span className="text-[10px] sm:text-[11px] font-medium text-[#7a8a6a]">
+                        ${d.value.toFixed(0)}
+                      </span>
                       <div
                         className={`w-full rounded-t-lg ${isCurrent ? "bg-[#1e3d18]" : "bg-[#c8e6c0]"}`}
-                        style={{ height: `${barH}px` }}
+                        style={{ height: `${Math.max(barH, d.value > 0 ? 4 : 0)}px` }}
                       />
                       <span className="text-[9px] sm:text-[10px] font-semibold tracking-widest text-[#9aaa8a]">{d.month}</span>
                     </div>
@@ -192,122 +243,28 @@ export default function AdminDashboard() {
               <p className="text-[12px] text-[#9aaa8a] mb-5">{dict.dashboard.adminHome.bestsellingProducts}</p>
 
               <div className="flex flex-col gap-5">
-                {topPerformers.map((p) => (
-                  <div key={p.name}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div>
-                        <p className="text-[14px] font-semibold text-[#1c2b1a]">{p.name}</p>
-                        <p className="text-[11px] italic text-[#9aaa8a]">{p.farm}</p>
+                {topPerformers.length === 0 ? (
+                  <p className="text-[13px] text-[#9aaa8a]">{dict.dashboard.adminHome.noSalesData}</p>
+                ) : (
+                  topPerformers.map((p) => (
+                    <div key={p.id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <p className="text-[14px] font-semibold text-[#1c2b1a]">{p.name}</p>
+                          <p className="text-[11px] italic text-[#9aaa8a]">{p.farm}</p>
+                        </div>
+                        <p className="text-[13px] font-semibold text-[#1c2b1a]">{p.revenue}</p>
                       </div>
-                      <p className="text-[13px] font-semibold text-[#1c2b1a]">{p.revenue}</p>
+                      <div className="h-1.5 bg-[#f0ece4] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#1e3d18] rounded-full"
+                          style={{ width: `${p.pct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 bg-[#f0ece4] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#1e3d18] rounded-full"
-                        style={{ width: `${p.pct}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Farmer accounts table */}
-          <div className="bg-white border border-[#ede8df] rounded-2xl p-5 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-              <div>
-                <h2 className="text-[20px] sm:text-[22px] font-semibold text-[#1c2b1a]" style={{ fontFamily: "Georgia, serif" }}>
-                  {dict.dashboard.adminHome.farmerAccounts}
-                </h2>
-                <p className="text-[13px] text-[#9aaa8a]">{dict.dashboard.adminHome.manageGrowers}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aaa8a]" />
-                  <input
-                    type="text"
-                    placeholder={dict.dashboard.adminHome.searchFarmersPlaceholder}
-                    value={farmerSearch}
-                    onChange={(e) => setFarmerSearch(e.target.value)}
-                    className="pl-9 pr-4 py-2 text-[13px] bg-[#faf9f6] border border-[#e0dbd0] rounded-full focus:outline-none focus:border-[#2d5a1b] transition-colors w-44"
-                  />
-                </div>
-                <button className="flex items-center gap-2 px-4 sm:px-5 py-2 bg-[#1e3d18] text-white rounded-full text-[13px] font-medium hover:bg-[#2d5a1b] transition-colors whitespace-nowrap">
-                  <Plus size={13} />
-                  {dict.dashboard.adminHome.addFarmer}
-                </button>
-              </div>
-            </div>
-
-            {/* Table — scrollable on mobile */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[540px]">
-                <thead>
-                  <tr className="border-b border-[#f0ece4]">
-                    {[
-                      dict.dashboard.adminHome.colFarm,
-                      dict.dashboard.adminHome.colRegion,
-                      dict.dashboard.adminHome.colPhone,
-                      dict.dashboard.adminHome.colStatus,
-                      dict.dashboard.adminHome.colActions,
-                    ].map((h) => (
-                      <th key={h} className="text-left text-[10px] font-semibold tracking-[0.15em] text-[#9aaa8a] pb-3 pr-4">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-[13px] text-[#9aaa8a]">
-                        {dict.dashboard.adminHome.loadingFarmers}
-                      </td>
-                    </tr>
-                  ) : error ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-[13px] text-[#b91c1c]">
-                        {error}
-                      </td>
-                    </tr>
-                  ) : filteredFarmers.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-[13px] text-[#9aaa8a]">
-                        {dict.dashboard.adminHome.noFarmersFound}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredFarmers.map((f) => {
-                      const s = statusConfig[f.status?.toUpperCase()] || defaultStatusStyle;
-                      return (
-                        <tr key={f.id} className="border-b border-[#f8f6f2] last:border-0 hover:bg-[#faf9f6] transition-colors">
-                          <td className="py-4 pr-4">
-                            <p className="text-[14px] font-semibold text-[#1c2b1a]">{f.farmName || f.farmerCode}</p>
-                            <p className="text-[12px] text-[#9aaa8a]">{f.user?.name || "—"}</p>
-                          </td>
-                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">{f.province?.name || "—"}</td>
-                          <td className="py-4 pr-4 text-[13px] text-[#5a6a52] whitespace-nowrap">{f.phone || "—"}</td>
-                          <td className="py-4 pr-4">
-                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wide px-3 py-1 rounded-full whitespace-nowrap ${s.color}`}>
-                              {s.icon}
-                              {f.status?.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="py-4 text-[13px] font-medium whitespace-nowrap">
-                            <Link
-                              href={`/dashboard/admin/farmers/${f.id}`}
-                              className="text-[#2d5a1b] hover:underline"
-                            >
-                              {dict.dashboard.adminHome.viewLink}
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
             </div>
           </div>
 

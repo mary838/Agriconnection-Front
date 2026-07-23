@@ -192,7 +192,7 @@ export default function CustomerRegisterPage() {
           </p>
 
           <h2
-            className="text-[38px] font-normal text-[#1c2b1a] mb-8"
+            className="text-[28px] sm:text-[38px] font-normal text-[#1c2b1a] mb-8"
             style={{ fontFamily: "Georgia, serif" }}
           >
             Create account

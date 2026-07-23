@@ -32,7 +32,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { addItem } = useCart();
+  const { cart, addItem } = useCart();
   const { language } = useLanguage();
   const { showToast } = useToast();
 
@@ -114,9 +114,14 @@ export default function ProductDetailPage() {
   const farmName =
     product.farmer?.user?.name || product.farmer?.farmerCode || "Local Farmer";
 
-  const total = (Number(product.priceUsd) * qty).toFixed(2);
   const stock = totalStock(product);
+  const cartQtyForProduct =
+    cart?.items?.find((i) => i.productId === product.id)?.quantity || 0;
+  const maxAddable = Math.max(0, stock - cartQtyForProduct);
   const outOfStock = stock <= 0;
+  const atCartLimit = !outOfStock && maxAddable <= 0;
+  const effectiveQty = Math.min(qty, Math.max(maxAddable, 1));
+  const total = (Number(product.priceUsd) * effectiveQty).toFixed(2);
 
   const handleAddToBasket = async () => {
     if (!user) {
@@ -124,12 +129,12 @@ export default function ProductDetailPage() {
       return;
     }
 
-    if (outOfStock) return;
+    if (outOfStock || atCartLimit) return;
 
     try {
       setAdding(true);
       setError("");
-      await addItem(product.id, qty);
+      await addItem(product.id, effectiveQty);
       setAdded(true);
       showToast(`Added ${product.name} to basket`, "success");
       setTimeout(() => setAdded(false), 2000);
@@ -268,6 +273,10 @@ export default function ProductDetailPage() {
               <p className="text-[13px] font-semibold text-red-500">
                 Out of stock
               </p>
+            ) : atCartLimit ? (
+              <p className="text-[13px] font-semibold text-amber-600">
+                You already have the max ({stock} {product.unit}) in your basket
+              </p>
             ) : (
               <p className="text-[13px] text-[#7a8a6a]">
                 {stock} {product.unit} available
@@ -277,8 +286,8 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-3 bg-white border border-[#e0dbd0] rounded-full px-4 py-2">
                 <button
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  disabled={outOfStock}
+                  onClick={() => setQty(Math.max(1, effectiveQty - 1))}
+                  disabled={outOfStock || atCartLimit || effectiveQty <= 1}
                   className="w-6 h-6 flex items-center justify-center text-[#4a5568] hover:text-[#1c2b1a] transition-colors disabled:opacity-50"
                 >
                   <Minus size={14} />
@@ -288,13 +297,13 @@ export default function ProductDetailPage() {
                   <input
                     type="number"
                     min={1}
-                    max={stock}
-                    value={outOfStock ? 0 : qty}
-                    disabled={outOfStock}
+                    max={maxAddable}
+                    value={outOfStock || atCartLimit ? 0 : effectiveQty}
+                    disabled={outOfStock || atCartLimit}
                     onChange={(e) => {
                       const value = Number(e.target.value);
                       if (Number.isNaN(value)) return;
-                      setQty(Math.min(stock, Math.max(1, value)));
+                      setQty(Math.min(maxAddable, Math.max(1, value)));
                     }}
                     onBlur={(e) => {
                       const value = Number(e.target.value);
@@ -306,8 +315,8 @@ export default function ProductDetailPage() {
                 </span>
 
                 <button
-                  onClick={() => setQty((q) => Math.min(stock, q + 1))}
-                  disabled={outOfStock || qty >= stock}
+                  onClick={() => setQty(Math.min(maxAddable, effectiveQty + 1))}
+                  disabled={outOfStock || atCartLimit || effectiveQty >= maxAddable}
                   className="w-6 h-6 flex items-center justify-center text-[#4a5568] hover:text-[#1c2b1a] transition-colors disabled:opacity-50"
                 >
                   <Plus size={14} />
@@ -316,11 +325,13 @@ export default function ProductDetailPage() {
 
               <button
                 onClick={handleAddToBasket}
-                disabled={isLoading || adding || outOfStock}
+                disabled={isLoading || adding || outOfStock || atCartLimit}
                 className="flex-1 bg-[#1e3d18] text-white text-[14px] font-medium px-6 py-3 rounded-full hover:bg-[#2d5a1b] transition-colors disabled:opacity-50"
               >
                 {outOfStock
                   ? "Out of stock"
+                  : atCartLimit
+                  ? "Max in basket"
                   : !user
                   ? "Sign in to buy"
                   : added

@@ -11,6 +11,8 @@ import {
   ApiError,
   resolveImageUrl,
   categoryName,
+  farmerName,
+  provinceName,
   type Farmer,
   type Product,
 } from "@/lib/api";
@@ -37,6 +39,8 @@ export default function AdminFarmerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<"approve" | "reject" | null>(null);
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,6 +62,33 @@ export default function AdminFarmerDetailPage() {
 
     fetchData();
   }, [farmerId, dict]);
+
+  const handleApprove = async () => {
+    try {
+      setActionError("");
+      setStatusUpdating("approve");
+      const updated = await farmersApi.approve(farmerId);
+      setFarmer((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : dict.dashboard.adminFarmerDetail.failedToUpdateStatus);
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!window.confirm(dict.dashboard.adminFarmerDetail.confirmReject)) return;
+    try {
+      setActionError("");
+      setStatusUpdating("reject");
+      const updated = await farmersApi.reject(farmerId);
+      setFarmer((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : dict.dashboard.adminFarmerDetail.failedToUpdateStatus);
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-[#f5f2eb]">
@@ -111,16 +142,46 @@ export default function AdminFarmerDetailPage() {
                         >
                           {displayName}
                         </h1>
-                        <p className="text-[13px] text-[#7a8a6a] mt-1">{farmer.user?.name || "—"}</p>
+                        <p className="text-[13px] text-[#7a8a6a] mt-1">{farmerName(farmer) || "—"}</p>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1.5 self-start text-[11px] font-bold tracking-wide px-3.5 py-1.5 rounded-full whitespace-nowrap ${s.color}`}>
-                      {s.icon}
-                      {farmer.status?.toUpperCase()}
-                    </span>
+                    <div className="flex items-center gap-3 self-start">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-3.5 py-1.5 rounded-full whitespace-nowrap ${s.color}`}>
+                        {s.icon}
+                        {farmer.status?.toUpperCase()}
+                      </span>
+                      {farmer.status?.toUpperCase() === "PENDING" && (
+                        <>
+                          <button
+                            onClick={handleApprove}
+                            disabled={statusUpdating !== null}
+                            className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full bg-[#1e3d18] text-white hover:bg-[#2d5a1b] transition-colors disabled:opacity-50"
+                          >
+                            {statusUpdating === "approve"
+                              ? dict.dashboard.adminFarmerDetail.approving
+                              : dict.dashboard.adminFarmerDetail.approveButton}
+                          </button>
+                          <button
+                            onClick={handleReject}
+                            disabled={statusUpdating !== null}
+                            className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full border border-[#f0ece4] text-[#b91c1c] hover:bg-red-50 transition-colors disabled:opacity-50"
+                          >
+                            {statusUpdating === "reject"
+                              ? dict.dashboard.adminFarmerDetail.rejecting
+                              : dict.dashboard.adminFarmerDetail.rejectButton}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
+
+              {actionError && (
+                <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600 text-sm">
+                  {actionError}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
                 <div className="lg:col-span-2 bg-white border border-[#ede8df] rounded-2xl p-5 sm:p-6">
@@ -137,7 +198,7 @@ export default function AdminFarmerDetailPage() {
                       <dt className="text-[10px] font-semibold tracking-[0.1em] uppercase text-[#9aaa8a] mb-1">Province</dt>
                       <dd className="text-[#1c2b1a] flex items-center gap-1.5">
                         <MapPin size={13} className="text-[#9aaa8a]" />
-                        {farmer.province?.name || "—"}
+                        {provinceName(farmer.province) || "—"}
                       </dd>
                     </div>
                     <div>
@@ -173,10 +234,10 @@ export default function AdminFarmerDetailPage() {
                       {farmer.telegramPhone}
                     </div>
                   )}
-                  {farmer.user?.email && (
+                  {(farmer.email || farmer.user?.email) && (
                     <div className="flex items-center gap-2.5 text-[14px] text-[#1c2b1a] pt-2 border-t border-[#ede8df] mt-1">
                       <Mail size={15} className="text-[#2d5a1b] shrink-0" />
-                      {farmer.user.email}
+                      {farmer.email || farmer.user?.email}
                     </div>
                   )}
                 </div>

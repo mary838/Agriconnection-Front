@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Minus, Plus, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { resolveImageUrl, ApiError, type CartItem } from "@/lib/api";
+import { resolveImageUrl, totalStock, ApiError, type CartItem } from "@/lib/api";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=300&q=80";
@@ -50,13 +50,19 @@ export default function CartPage() {
     }
   };
 
+  const stockFor = (item: CartItem) =>
+    item.product ? totalStock(item.product) : item.quantity;
+
   const updateQty = (item: CartItem, delta: number) => {
-    const nextQty = Math.max(1, item.quantity + delta);
+    const stock = stockFor(item);
+    const nextQty = Math.min(stock, Math.max(1, item.quantity + delta));
+    if (nextQty === item.quantity) return;
     runAction(item.id, () => updateItem(item.id, nextQty));
   };
 
   const setQty = (item: CartItem, quantity: number) => {
-    const nextQty = Math.max(1, quantity);
+    const stock = stockFor(item);
+    const nextQty = Math.min(stock, Math.max(1, quantity));
     if (nextQty === item.quantity) return;
     runAction(item.id, () => updateItem(item.id, nextQty));
   };
@@ -118,6 +124,7 @@ export default function CartPage() {
                     product?.imageUrl
                 ) || FALLBACK_IMAGE;
                 const isBusy = busyId === item.id;
+                const stock = stockFor(item);
 
                 return (
                   <div
@@ -160,7 +167,7 @@ export default function CartPage() {
                       <div className="flex items-center gap-3 border border-[#e0dbd0] rounded-full px-4 py-2 bg-white">
                         <button
                           onClick={() => updateQty(item, -1)}
-                          disabled={isBusy}
+                          disabled={isBusy || item.quantity <= 1}
                           className="text-[#7a8a6a] hover:text-[#1c2b1a] transition-colors disabled:opacity-50"
                         >
                           <Minus size={13} />
@@ -169,6 +176,7 @@ export default function CartPage() {
                           key={item.quantity}
                           type="number"
                           min={1}
+                          max={stock}
                           defaultValue={item.quantity}
                           disabled={isBusy}
                           onBlur={(e) => {
@@ -186,7 +194,7 @@ export default function CartPage() {
                         />
                         <button
                           onClick={() => updateQty(item, 1)}
-                          disabled={isBusy}
+                          disabled={isBusy || item.quantity >= stock}
                           className="text-[#7a8a6a] hover:text-[#1c2b1a] transition-colors disabled:opacity-50"
                         >
                           <Plus size={13} />

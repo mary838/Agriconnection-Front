@@ -11,6 +11,7 @@ import {
   ApiError,
   resolveImageUrl,
   categoryName,
+  provinceName,
   type Farmer,
   type Product,
 } from "@/lib/api";
@@ -117,10 +118,10 @@ export default function FarmerProfilePage() {
               )}
 
               <div className="flex items-center gap-4 flex-wrap text-[13.5px] text-[#7a8a6a]">
-                {farmer.province?.name && (
+                {provinceName(farmer.province) && (
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={14} />
-                    {farmer.province.name}
+                    {provinceName(farmer.province)}
                   </span>
                 )}
                 <span className="text-[#9aaa8a]">{farmer.farmerCode}</span>

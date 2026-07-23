@@ -108,7 +108,7 @@ function ResetPasswordForm() {
               </p>
 
               <h2
-                className="text-[38px] font-normal text-[#1c2b1a] mb-3 leading-tight"
+                className="text-[28px] sm:text-[38px] font-normal text-[#1c2b1a] mb-3 leading-tight"
                 style={{ fontFamily: "Georgia, serif" }}
               >
                 Create new password
@@ -186,7 +186,7 @@ function ResetPasswordForm() {
               </p>
 
               <h2
-                className="text-[34px] font-normal text-[#1c2b1a] mb-3 leading-tight"
+                className="text-[26px] sm:text-[34px] font-normal text-[#1c2b1a] mb-3 leading-tight"
                 style={{ fontFamily: "Georgia, serif" }}
               >
                 You can sign in now

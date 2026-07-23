@@ -13,7 +13,9 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { auth, clearToken } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
   { icon: LayoutDashboard, key: "Overview", href: "/dashboard/admin" },
@@ -35,6 +37,7 @@ export default function AdminSidebar({
   onClose: () => void;
 }) {
   const { dict } = useLanguage();
+  const { user } = useAuth();
 
   const navLabels: Record<string, string> = {
     Overview: dict.dashboard.shared.navOverview,
@@ -113,16 +116,38 @@ export default function AdminSidebar({
         </nav>
 
         <div className="mx-3 mb-4 bg-white/10 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-3 mb-3">
+          <Link
+            href="/profile"
+            onClick={onClose}
+            className="flex items-center gap-3 mb-3 hover:opacity-80 transition-opacity"
+          >
             <div className="w-9 h-9 rounded-full overflow-hidden bg-[#b8cfa8] shrink-0 flex items-center justify-center text-[#1e3d18] font-bold">
-              {dict.dashboard.shared.adminFallbackName.charAt(0)}
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name || dict.dashboard.shared.adminFallbackName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                (user?.name || dict.dashboard.shared.adminFallbackName).charAt(0).toUpperCase()
+              )}
             </div>
             <div className="min-w-0">
-              <p className="text-white text-[13px] font-medium leading-tight">{dict.dashboard.shared.adminFallbackName}</p>
+              <p className="text-white text-[13px] font-medium leading-tight truncate">
+                {user?.name || dict.dashboard.shared.adminFallbackName}
+              </p>
               <p className="text-white/50 text-[11px] truncate">{dict.dashboard.shared.platformAdminLabel}</p>
             </div>
-          </div>
-          <button className="flex items-center gap-2 text-white/50 hover:text-white text-[12px] transition-colors">
+          </Link>
+          <button
+            onClick={async () => {
+              await auth.logout().catch(() => {});
+              clearToken();
+              localStorage.removeItem("user");
+              window.location.href = "/login";
+            }}
+            className="flex items-center gap-2 text-white/50 hover:text-white text-[12px] transition-colors"
+          >
             <LogOut size={13} />
             {dict.dashboard.shared.signOut}
           </button>
